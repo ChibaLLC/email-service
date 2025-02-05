@@ -9,7 +9,7 @@
 					<code>
 						<pre>
 
-const response = await fetch("https://sutit.org/mail/send", {
+const response = await fetch("https://thedomain/send", {
 	method: "POST",
 	body: JSON.stringify({
 			from: "optional@sutit.org",
