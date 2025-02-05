@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
 				.string()
 				.optional()
 				.refine(
-					(email) => email?.endsWith("sutit.org"),
+					(email) => (email ? email?.endsWith("sutit.org") : true),
 					"The 'from' email provided is not a sutit email."
 				),
 			to: z.string(),
@@ -15,8 +15,8 @@ export default defineEventHandler(async (event) => {
 		})
 		.and(
 			z.union([
-				z.object({ text: z.string() }).strict(),
-				z.object({ html: z.string() }).strict(),
+				z.object({ text: z.string() }),
+				z.object({ html: z.string() }),
 			])
 		);
 
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 		throw createError({
 			statusCode: 400,
 			message: error.message,
-			data: error.message,
+			data: await readBody(event),
 			cause: error.cause,
 		});
 	}
