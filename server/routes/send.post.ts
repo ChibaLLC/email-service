@@ -1,24 +1,19 @@
 import { z } from "zod";
 
+const schema = z
+	.object({
+		from: z
+			.string()
+			.optional()
+			.refine(
+				(email) => (email ? validateEmail(email).valid : true),
+				"The 'from' email provided is not a sutit email."
+			),
+		to: z.union([z.string(), z.array(z.string())]),
+		subject: z.string(),
+	})
+	.and(z.union([z.object({ text: z.string() }), z.object({ html: z.string() })]));
 export default defineEventHandler(async (event) => {
-	const schema = z
-		.object({
-			from: z
-				.string()
-				.optional()
-				.refine(
-					(email) => (email ? email?.endsWith("sutit.org") : true),
-					"The 'from' email provided is not a sutit email."
-				),
-			to: z.string(),
-			subject: z.string(),
-		})
-		.and(
-			z.union([
-				z.object({ text: z.string() }),
-				z.object({ html: z.string() }),
-			])
-		);
 
 	const { data, error } = await readValidatedBody(event, schema.safeParse);
 	if (error) {

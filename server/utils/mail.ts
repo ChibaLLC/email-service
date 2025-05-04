@@ -11,7 +11,7 @@ export const transporter = createTransport({
 });
 
 export async function sendMail(
-	data: { to: string; subject: string; from?: string } & ({ text: string } | { html: string })
+	data: { to: string | string[]; subject: string; from?: string } & ({ text: string } | { html: string })
 ) {
 	try {
 		return await transporter.sendMail({

@@ -4,7 +4,7 @@
 		<div class="absolute w-full h-full radial-gradient top-0 left-0"></div>
 		<Transition mode="out-in">
 			<div v-if="success" class="h-screen flex flex-col mx-auto">
-				<article tag="article" class="h-fit bg-white/75 dark:bg-white/5 backdrop-blur p-4">
+				<article tag="article" class="h-fit bg-white/75 dark:bg-white/5 backdrop-blur p-4 mt-4">
 					<h2>Usage:</h2>
 					<code>
 						<pre>
