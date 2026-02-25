@@ -11,6 +11,9 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
+# Generate SQL migration files from schema
+RUN pnpm db:generate
+
 # ---- Production Stage ----
 FROM node:20-alpine AS production
 
@@ -22,6 +25,9 @@ COPY --from=builder /app/.output .output
 COPY --from=builder /app/package.json .
 COPY --from=builder /app/node_modules node_modules
 COPY --from=builder /app/drizzle drizzle
+COPY --from=builder /app/drizzle.config.ts .
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
 
 EXPOSE 3000
 
@@ -29,4 +35,5 @@ ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV NODE_ENV=production
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", ".output/server/index.mjs"]
