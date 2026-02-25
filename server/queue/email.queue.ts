@@ -8,6 +8,7 @@ export interface EmailJobData {
   subject: string;
   text?: string;
   html?: string;
+  attachments?: { filename: string; content?: string; path?: string; contentType?: string; encoding?: string }[];
 }
 
 let _queue: Queue | null = null;

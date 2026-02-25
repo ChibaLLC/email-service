@@ -1,9 +1,18 @@
+export interface EmailAttachment {
+  filename: string;
+  content?: string;
+  path?: string;
+  contentType?: string;
+  encoding?: string;
+}
+
 export interface EmailMessage {
   from?: string;
   to: string | string[];
   subject: string;
   text?: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailResult {

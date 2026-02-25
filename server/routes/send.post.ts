@@ -4,6 +4,14 @@ import { addEmailJob } from "../queue/email.queue";
 import { hashApiKey } from "../utils/auth";
 import { eq } from "drizzle-orm";
 
+const attachmentSchema = z.object({
+  filename: z.string(),
+  content: z.string().optional(),
+  path: z.string().optional(),
+  contentType: z.string().optional(),
+  encoding: z.string().optional(),
+});
+
 const sendSchema = z
   .object({
     from: z
@@ -15,6 +23,7 @@ const sendSchema = z
       ),
     to: z.union([z.string(), z.array(z.string())]),
     subject: z.string(),
+    attachments: z.array(attachmentSchema).optional(),
   })
   .and(z.union([z.object({ text: z.string() }), z.object({ html: z.string() })]));
 
@@ -69,6 +78,7 @@ export default defineEventHandler(async (event) => {
     to: data.to,
     subject: data.subject,
     ...("html" in data ? { html: data.html } : { text: data.text }),
+    ...(data.attachments?.length ? { attachments: data.attachments } : {}),
   });
 
   // Update last used

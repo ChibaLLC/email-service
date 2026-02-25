@@ -1,10 +1,10 @@
 <template>
   <UContainer>
     <Title>Email Service — API</Title>
-    <div class="absolute w-full h-full radial-gradient top-0 left-0"></div>
+    <div class="fixed inset-0 radial-gradient"></div>
     <Transition mode="out-in">
       <!-- Post-success: API Documentation -->
-      <div v-if="success" class="min-h-screen py-12">
+      <div v-if="success" class="relative min-h-screen py-12">
         <div class="max-w-3xl mx-auto space-y-6">
           <!-- Header -->
           <div class="text-center mb-8">
@@ -66,11 +66,17 @@
                       <td class="py-2 pr-4">*</td>
                       <td class="py-2">HTML body</td>
                     </tr>
-                    <tr>
+                    <tr class="border-b border-gray-800/50">
                       <td class="py-2 pr-4 font-mono text-lime-400">from</td>
                       <td class="py-2 pr-4">string</td>
                       <td class="py-2 pr-4"></td>
                       <td class="py-2">Sender (defaults to service default)</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 pr-4 font-mono text-lime-400">attachments</td>
+                      <td class="py-2 pr-4">object[]</td>
+                      <td class="py-2 pr-4"></td>
+                      <td class="py-2">File attachments (filename, content, contentType, encoding)</td>
                     </tr>
                   </tbody>
                 </table>
@@ -84,35 +90,13 @@
             <!-- cURL Example -->
             <div>
               <h3 class="text-sm font-semibold text-gray-400 mb-2">cURL</h3>
-              <pre class="text-sm bg-gray-900 text-gray-300 p-4 rounded-lg overflow-x-auto">
-curl -X POST https://your-domain/send \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "to": "recipient@example.com",
-    "subject": "Hello",
-    "text": "Hello from the email service!"
-  }'</pre
-              >
+              <CodeBlock :code="curlExample" lang="bash" />
             </div>
 
             <!-- Fetch Example -->
             <div>
               <h3 class="text-sm font-semibold text-gray-400 mb-2">JavaScript (fetch)</h3>
-              <pre class="text-sm bg-gray-900 text-gray-300 p-4 rounded-lg overflow-x-auto">
-const response = await fetch("https://your-domain/send", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    to: "recipient@example.com",
-    subject: "Hello",
-    html: "&lt;h1&gt;Hello!&lt;/h1&gt;&lt;p&gt;Sent via the email service.&lt;/p&gt;"
-  })
-})</pre
-              >
+              <CodeBlock :code="fetchExample" lang="javascript" />
             </div>
 
             <!-- Response Codes -->
@@ -147,7 +131,7 @@ const response = await fetch("https://your-domain/send", {
       </div>
 
       <!-- Pre-success: API Key Request Form -->
-      <div class="h-screen grid place-items-center" v-else>
+      <div class="relative h-screen grid place-items-center" v-else>
         <div
           class="rounded-xl divide-y divide-gray-200 dark:divide-gray-800 ring-1 ring-gray-200 dark:ring-gray-800 shadow max-w-sm w-full bg-white/75 dark:bg-white/5 backdrop-blur h-fit mx-auto -mt-60"
         >
@@ -226,15 +210,55 @@ function reset() {
   sessionStorage.removeItem("__MAIL_KEY__success");
 }
 
+// Dynamic domain + API key for code examples
+const baseUrl = ref("");
+const apiKey = ref("YOUR_API_KEY");
+
 onMounted(() => {
   const value = sessionStorage.getItem("__MAIL_KEY__success");
   success.value = value === "true";
+
+  baseUrl.value = window.location.origin;
+  const storedKey = sessionStorage.getItem("__MAIL_KEY__key");
+  if (storedKey) apiKey.value = storedKey;
 });
+
+const curlExample = computed(
+  () => `curl -X POST ${baseUrl.value}/send \\
+  -H "Authorization: Bearer ${apiKey.value}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "to": "recipient@example.com",
+    "subject": "Meeting Invite",
+    "html": "<p>You are invited!</p>",
+    "attachments": [{
+      "filename": "invite.ics",
+      "content": "BEGIN:VCALENDAR\\nEND:VCALENDAR",
+      "contentType": "text/calendar"
+    }]
+  }'`,
+);
+
+const fetchExample = computed(
+  () => `const response = await fetch("${baseUrl.value}/send", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer ${apiKey.value}",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    to: "recipient@example.com",
+    subject: "Hello",
+    html: "<h1>Hello!</h1><p>Sent via the email service.</p>"
+  })
+})`,
+);
 </script>
 
 <style>
 .radial-gradient {
   background: radial-gradient(50% 50% at 50% 50%, rgb(56 189 248 / 0.1) 0, rgb(3 7 18));
+  pointer-events: none;
 }
 
 .v-enter-active,

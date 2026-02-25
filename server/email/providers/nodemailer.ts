@@ -24,6 +24,7 @@ export class NodemailerProvider implements EmailProvider {
         to: Array.isArray(message.to) ? message.to.join(", ") : message.to,
         subject: message.subject,
         ...(message.html ? { html: message.html } : { text: message.text }),
+        ...(message.attachments?.length ? { attachments: message.attachments } : {}),
       });
 
       return {

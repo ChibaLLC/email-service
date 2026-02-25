@@ -15,7 +15,7 @@ export function startEmailWorker() {
   _worker = new Worker<EmailJobData>(
     "email-send",
     async (job) => {
-      const { emailId, from, to, subject, text, html } = job.data;
+      const { emailId, from, to, subject, text, html, attachments } = job.data;
 
       // Mark as sending
       await db
@@ -24,7 +24,7 @@ export function startEmailWorker() {
         .where(eq(schema.emails.id, emailId));
 
       // Send via provider
-      const result = await provider.send({ from, to, subject, text, html });
+      const result = await provider.send({ from, to, subject, text, html, attachments });
 
       if (result.success) {
         await db

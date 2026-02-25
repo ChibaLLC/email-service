@@ -1,9 +1,23 @@
+export interface EmailAttachment {
+  /** File name for the attachment */
+  filename: string;
+  /** String or base64-encoded content */
+  content?: string;
+  /** URL or file path to fetch content from */
+  path?: string;
+  /** MIME type, e.g. "text/calendar", "application/pdf" */
+  contentType?: string;
+  /** Content encoding, e.g. "base64" */
+  encoding?: string;
+}
+
 export interface EmailMessage {
   from?: string;
   to: string | string[];
   subject: string;
   text?: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailResult {

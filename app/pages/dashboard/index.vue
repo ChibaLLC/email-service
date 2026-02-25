@@ -58,23 +58,35 @@
         <!-- Email Volume Chart (line) -->
         <div class="lg:col-span-2 rounded-xl bg-white/5 ring-1 ring-gray-800 p-5">
           <h3 class="text-sm font-medium text-gray-400 mb-4">Email Volume (30 days)</h3>
-          <VChart :option="lineChartOption" autoresize class="h-72" />
+          <div class="h-72">
+            <ClientOnly>
+              <VChart :option="lineChartOption" autoresize style="width: 100%; height: 100%" />
+            </ClientOnly>
+          </div>
         </div>
 
         <!-- Status Breakdown (pie) -->
         <div class="rounded-xl bg-white/5 ring-1 ring-gray-800 p-5">
           <h3 class="text-sm font-medium text-gray-400 mb-4">Status Breakdown</h3>
-          <VChart :option="pieChartOption" autoresize class="h-72" />
+          <div class="h-72">
+            <ClientOnly>
+              <VChart :option="pieChartOption" autoresize style="width: 100%; height: 100%" />
+            </ClientOnly>
+          </div>
         </div>
       </div>
 
       <!-- Queue Health + Recent Emails -->
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <!-- Queue Health -->
-        <div class="rounded-xl bg-white/5 ring-1 ring-gray-800 p-5">
+        <div class="rounded-xl bg-white/5 ring-1 ring-gray-800 p-5 flex flex-col">
           <h3 class="text-sm font-medium text-gray-400 mb-4">Queue Health</h3>
-          <VChart :option="gaugeChartOption" autoresize class="h-48" />
-          <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+          <div class="h-48 shrink-0">
+            <ClientOnly>
+              <VChart :option="gaugeChartOption" autoresize style="width: 100%; height: 100%" />
+            </ClientOnly>
+          </div>
+          <div class="grid grid-cols-4 gap-2 mt-auto pt-3 border-t border-gray-800/50 text-xs">
             <div class="text-center">
               <div class="text-gray-500">Active</div>
               <div class="text-white font-semibold">{{ queue?.active ?? 0 }}</div>
@@ -107,7 +119,6 @@
 </template>
 
 <script setup lang="ts">
-import VChart from "vue-echarts";
 import type { DashboardStats, QueueStats, EmailRecord } from "~~/shared/types";
 import type { TableColumn } from "@nuxt/ui";
 

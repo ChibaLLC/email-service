@@ -5,6 +5,9 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev:start": "node scripts/dev.mjs",
+    "dev:stop": "node scripts/dev.mjs --stop",
+    "dev:reset": "node scripts/dev.mjs --reset",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -42,6 +45,7 @@
     "nodemailer": "^6.10.1",
     "nuxt-echarts": "^1.0.1",
     "pg": "^8.18.0",
+    "shiki": "^3.23.0",
     "ulid": "^2.4.0",
     "uuid": "^11.1.0",
     "vue-echarts": "^8.0.1",
