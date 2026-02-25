@@ -53,5 +53,20 @@
       }
     }
   },
-  "postStartCommand": "sudo bash /usr/local/bin/post-setup.sh"
+  "postStartCommand": "sudo bash /usr/local/bin/post-setup.sh",
+  "forwardPorts": [5432,6379],
+  "portsAttributes": {
+    "3000": {
+      "label": "Application",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "Postgres",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    }
+  }
 }
