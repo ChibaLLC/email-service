@@ -1,0 +1,57 @@
+{
+  "name": "Email Service Dev Container",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/email-service",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "coder",
+  "features": {
+    "ghcr.io/devcontainers/features/node": {},
+    "ghcr.io/devcontainers-extra/features/pnpm": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker": {},
+    "ghcr.io/devcontainers/features/github-cli": {}
+  },
+  "postCreateCommand": "sudo chown coder:coder -R . && sudo /usr/local/bin/setup-git.sh && sudo /usr/local/bin/setup-dev.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "antfu.goto-alias",
+        "chwoerz.type-buddy",
+        "atommaterial.a-file-icon-vscode",
+        "usernamehw.errorlens",
+        "mikestead.dotenv",
+        "github.vscode-github-actions",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "wayou.vscode-todo-highlight",
+        "vue.volar",
+        "shd101wyy.markdown-preview-enhanced",
+        "christian-kohler.path-intellisense",
+        "doggy8088.quicktype-refresh",
+        "jock.svg",
+        "redhat.vscode-yaml",
+        "irongeek.vscode-env",
+        "yoavbls.pretty-ts-errors",
+        "alimozdemir.vscode-nuxt-dx-tools",
+        "eamodio.gitlens",
+        "pushqrdx.inline-html",
+        "typescriptteam.native-preview",
+        "docker.docker",
+        "afzalsayed96.icones",
+        "antfu.iconify",
+        "Tobermory.es6-string-html",
+        "cweijan.dbclient-jdbc",
+        "cweijan.vscode-database-client2",
+        "WakaTime.vscode-wakatime",
+        "Lakshmisankar.vscode-lucide-icons"
+      ],
+      "settings": {
+        "files.eol": "\n",
+        "telemetry.telemetryLevel": "off"
+      }
+    }
+  },
+  "postStartCommand": "sudo bash /usr/local/bin/start-desktop.sh && sudo bash /usr/local/bin/post-setup.sh"
+}

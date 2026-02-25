@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "email-service",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,25 +7,44 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "devDependencies": {
     "@iconify-json/line-md": "^1.2.14",
     "@iconify-json/material-symbols-light": "^1.2.58",
     "@nuxt/devtools": "latest",
+    "@nuxt/test-utils": "^4.0.0",
     "@nuxt/ui": "^4.5.0",
     "@tailwindcss/vite": "^4.2.1",
     "@types/nodemailer": "^6.4.23",
+    "@types/pg": "^8.16.0",
+    "@vitejs/plugin-vue": "^6.0.4",
+    "drizzle-kit": "^0.31.9",
     "nuxt": "^4.3.1",
     "tailwindcss": "^4.2.1",
+    "vitest": "^4.0.18",
     "vue": "latest"
   },
   "packageManager": "pnpm@10.30.2",
   "dependencies": {
+    "@vue-email/render": "^0.0.9",
+    "bullmq": "^5.70.1",
     "drizzle-orm": "^0.39.3",
+    "echarts": "^6.0.0",
+    "ioredis": "^5.9.3",
+    "jose": "^6.1.3",
     "nodemailer": "^6.10.1",
+    "nuxt-echarts": "^1.0.1",
+    "pg": "^8.18.0",
     "ulid": "^2.4.0",
     "uuid": "^11.1.0",
+    "vue-echarts": "^8.0.1",
     "zod": "^3.25.76"
   }
 }

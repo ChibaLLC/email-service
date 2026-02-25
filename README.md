@@ -1,75 +1,95 @@
-# Nuxt UI Minimal Starter
+# Email Service
 
-Look at [Nuxt docs](https://nuxt.com/docs/getting-started/introduction) and [Nuxt UI docs](https://ui.nuxt.com) to learn more.
+Production-ready email service with queue processing, provider-agnostic architecture, and monitoring dashboard.
 
-## Setup
+## Quick Start
 
-Make sure to install the dependencies:
+### 1. Docker Compose (PostgreSQL + Redis)
 
 ```bash
-# npm
-npm install
+docker compose up -d
+```
 
-# pnpm
+### 2. Local Development
+
+```bash
+cp .env.example .env
+# Edit .env with your SMTP credentials
+
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
+pnpm db:push        # Push schema to PostgreSQL
+pnpm dev            # Start dev server
 ```
 
-## Development Server
+### 3. Access
 
-Start the development server on `http://localhost:3000`:
+| URL                                     | Description          |
+| --------------------------------------- | -------------------- |
+| `http://localhost:3000`                 | API key registration |
+| `http://localhost:3000/dashboard/login` | Dashboard login      |
+| `http://localhost:3000/dashboard`       | Monitoring dashboard |
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Nuxt 4 Application                     │
+├──────────────┬───────────────┬───────────────────────────┤
+│   Frontend   │   API Layer   │      Queue Worker         │
+│  (Nuxt UI +  │  (Nitro H3)   │     (BullMQ)             │
+│   ECharts)   │               │                           │
+├──────────────┼───────────────┼───────────────────────────┤
+│              │               │                           │
+│  Dashboard   │  POST /send   │  EmailProvider Interface  │
+│  /dashboard  │  POST /api/key│  ├─ NodemailerProvider    │
+│              │  GET  /api/*  │  ├─ (ResendProvider)      │
+│              │               │  └─ (SendGridProvider)    │
+├──────────────┴───────────────┴───────────────────────────┤
+│           PostgreSQL          │         Redis             │
+│    (api_keys, emails)         │   (BullMQ job queue)      │
+└───────────────────────────────┴──────────────────────────┘
+```
+
+## API Usage
+
+### Register for an API Key
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm run dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
+curl -X POST http://localhost:3000/api/key \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@ifkafin.com"}'
 ```
 
-## Production
-
-Build the application for production:
+### Send an Email
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm run build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+curl -X POST http://localhost:3000/send \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "recipient@example.com",
+    "subject": "Hello",
+    "text": "Hello from the email service!"
+  }'
 ```
 
-Locally preview production build:
+## Adding a New Email Provider
 
-```bash
-# npm
-npm run preview
+1. Create `server/email/providers/your-provider.ts` implementing `EmailProvider`
+2. Add the case in `server/email/providers/index.ts`
+3. Set `EMAIL_PROVIDER=your-provider` in `.env`
 
-# pnpm
-pnpm run preview
+## Scripts
 
-# yarn
-yarn preview
+| Script             | Description              |
+| ------------------ | ------------------------ |
+| `pnpm dev`         | Start development server |
+| `pnpm build`       | Build for production     |
+| `pnpm db:push`     | Push schema to database  |
+| `pnpm db:generate` | Generate migrations      |
+| `pnpm db:migrate`  | Run migrations           |
+| `pnpm db:studio`   | Open Drizzle Studio      |
 
-# bun
-bun run preview
-```
+## Environment Variables
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+See [.env.example](.env.example) for all configuration options.

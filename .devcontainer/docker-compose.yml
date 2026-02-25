@@ -1,0 +1,96 @@
+services:
+  # Main development container (VS Code attaches here)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    command: /bin/bash -c "while true; do sleep 1; done"
+    volumes:
+      - ..:/workspaces/email-service:cached
+      # Mount SSH and Git config for Git authentication
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro
+      - ${HOME}/.gitconfig:/home/vscode/.gitconfig:ro
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: email_service
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/email_service
+      REDIS_URL: redis://redis:6379
+      EMAIL_PROVIDER: nodemailer
+      SMTP_HOST: smtp.titan.email
+      SMTP_PORT: 587
+      SMTP_USER: noreply@ifkafin.com
+      SMTP_PASS: ""
+      DEFAULT_FROM: noreply@ifkafin.com
+      JWT_SECRET: dev_container_secret_change_in_prod
+      ALLOWED_DOMAINS: ifkafin.com,finueva.com,heilomeet.com
+    networks:
+      - email-dev
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`app.localhost`)"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
+    depends_on:
+      - traefik
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "ps", "aux"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - email-dev
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+    ports:
+      - "80:80"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: email_service
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - email-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - email-dev
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  email-dev:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
