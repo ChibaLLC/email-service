@@ -33,6 +33,6 @@ export async function verifyOTP(email: string, code: string): Promise<boolean> {
   }
 
   // Delete on success — one-time use
-  await redis.del(key);
+  redis.del(key);
   return true;
 }

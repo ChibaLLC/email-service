@@ -111,7 +111,7 @@ import VChart from "vue-echarts";
 import type { DashboardStats, QueueStats, EmailRecord } from "~~/shared/types";
 import type { TableColumn } from "@nuxt/ui";
 
-definePageMeta({ layout: false });
+definePageMeta({ layout: false, middleware: ["auth"] });
 
 const toast = useToast();
 

@@ -139,8 +139,9 @@ const response = await fetch("https://your-domain/send", {
             </div>
           </article>
 
-          <div class="text-center">
+          <div class="text-center flex justify-center gap-2">
             <UButton variant="ghost" color="neutral" @click="reset"> Request another API key </UButton>
+            <UButton variant="soft" color="neutral" to="/dashboard"> View Dashboard </UButton>
           </div>
         </div>
       </div>
@@ -171,6 +172,10 @@ const response = await fetch("https://your-domain/send", {
                 Get API Key
               </UButton>
             </UForm>
+
+            <div class="mt-6 text-center">
+              <UButton variant="link" color="neutral" to="/dashboard">Go to Dashboard</UButton>
+            </div>
           </div>
         </div>
       </div>

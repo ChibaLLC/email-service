@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: false });
+definePageMeta({ layout: false, middleware: ["auth"] });
 
 const toast = useToast();
 const revoking = ref<string | null>(null);

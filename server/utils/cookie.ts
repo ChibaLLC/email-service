@@ -12,3 +12,13 @@ export function getDashboardCookieOptions(overrides?: Partial<CookieSerializeOpt
     ...overrides,
   };
 }
+
+export function getDashboardLoggedInCookieOptions(overrides?: Partial<CookieSerializeOptions>): CookieSerializeOptions {
+  return {
+    path: "/",
+    maxAge: 60 * 60 * 24, // 24 hours
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    ...overrides,
+  };
+}

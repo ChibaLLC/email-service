@@ -2,7 +2,12 @@ import { z } from "zod";
 import { verifyOTP } from "../../utils/otp";
 import { signJWT, getJWTSecret } from "../../utils/jwt";
 import { validateEmail } from "~~/shared/utils/utils";
-import { DASHBOARD_COOKIE_NAME, getDashboardCookieOptions } from "../../utils/cookie";
+import { DASHBOARD_LOGGED_IN_COOKIE } from "~~/shared/utils/cookie";
+import {
+  DASHBOARD_COOKIE_NAME,
+  getDashboardCookieOptions,
+  getDashboardLoggedInCookieOptions,
+} from "../../utils/cookie";
 
 const verifySchema = z.object({
   email: z.string().email(),
@@ -40,6 +45,9 @@ export default defineEventHandler(async (event) => {
 
   // Set signed cookie
   setCookie(event, DASHBOARD_COOKIE_NAME, token, getDashboardCookieOptions());
+
+  // Set non-HttpOnly cookie for client-side middleware
+  setCookie(event, DASHBOARD_LOGGED_IN_COOKIE, "1", getDashboardLoggedInCookieOptions());
 
   return { success: true, email: data.email };
 });
