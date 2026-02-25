@@ -25,3 +25,4 @@ drizzle/
 .env
 .env.*
 !.env.example
+.pnpm-store

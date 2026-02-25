@@ -53,5 +53,5 @@
       }
     }
   },
-  "postStartCommand": "sudo bash /usr/local/bin/start-desktop.sh && sudo bash /usr/local/bin/post-setup.sh"
+  "postStartCommand": "sudo bash /usr/local/bin/post-setup.sh"
 }
