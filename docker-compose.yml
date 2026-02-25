@@ -20,15 +20,12 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: redis-server --appendonly yes
-    environment:
-      REDIS_USER: ${REDIS_USER:-redis}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_pass}
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_pass}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -44,7 +41,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-email_service}:${POSTGRES_PASSWORD:-email_service_pass}@postgres:5432/${POSTGRES_DB:-email_service}
-      REDIS_URL: redis://${REDIS_USER:-redis}:${REDIS_PASSWORD:-redis_pass}@redis:6379
+      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
