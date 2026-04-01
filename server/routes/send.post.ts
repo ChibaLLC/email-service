@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, schema } from "../database";
+import { getDefaultFromAddress } from "../email/config";
 import { addEmailJob } from "../queue/email.queue";
 import { hashApiKey } from "../utils/auth";
 import { eq } from "drizzle-orm";
@@ -55,7 +56,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const from = data.from || process.env.DEFAULT_FROM || "noreply@ifkafin.com";
+  const from = data.from || getDefaultFromAddress();
   const bodyType = "html" in data ? "html" : "text";
 
   // Insert email record

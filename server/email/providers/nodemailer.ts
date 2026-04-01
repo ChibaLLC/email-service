@@ -1,18 +1,21 @@
 import { createTransport, type Transporter } from "nodemailer";
+import { getDefaultFromAddress, parseEmailProviderConfig, type NodemailerConfig } from "../config";
 import type { EmailProvider, EmailMessage, EmailResult } from "../types";
 
 export class NodemailerProvider implements EmailProvider {
   readonly name = "nodemailer";
   private transporter: Transporter;
+  private config: NodemailerConfig;
 
   constructor() {
+    this.config = parseEmailProviderConfig("nodemailer");
     this.transporter = createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: parseInt(process.env.SMTP_PORT || "587") === 465,
+      host: this.config.SMTP_HOST,
+      port: this.config.SMTP_PORT,
+      secure: this.config.SMTP_PORT === 465,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: this.config.SMTP_USER,
+        pass: this.config.SMTP_PASS,
       },
     });
   }
@@ -20,7 +23,7 @@ export class NodemailerProvider implements EmailProvider {
   async send(message: EmailMessage): Promise<EmailResult> {
     try {
       const result = await this.transporter.sendMail({
-        from: message.from || process.env.DEFAULT_FROM,
+        from: message.from || getDefaultFromAddress(this.config),
         to: Array.isArray(message.to) ? message.to.join(", ") : message.to,
         subject: message.subject,
         ...(message.html ? { html: message.html } : { text: message.text }),

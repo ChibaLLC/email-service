@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { env } from "std-env";
 
 const ALG = "HS256";
 
@@ -27,7 +28,7 @@ export async function verifyJWT(token: string, secret: string): Promise<Dashboar
  * Get JWT_SECRET from env with a clear error if missing.
  */
 export function getJWTSecret(): string {
-  const secret = process.env.JWT_SECRET;
+  const secret = env.JWT_SECRET;
   if (!secret) {
     throw createError({
       statusCode: 500,

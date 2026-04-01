@@ -1,11 +1,12 @@
 import type { CookieSerializeOptions } from "cookie-es";
+import { env } from "std-env";
 
 export const DASHBOARD_COOKIE_NAME = "dashboard_token";
 
 export function getDashboardCookieOptions(overrides?: Partial<CookieSerializeOptions>): CookieSerializeOptions {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.NODE_ENV === "production",
     sameSite: "lax" as const,
     maxAge: 60 * 60 * 24, // 24 hours
     path: "/",
@@ -18,7 +19,7 @@ export function getDashboardLoggedInCookieOptions(overrides?: Partial<CookieSeri
     path: "/",
     maxAge: 60 * 60 * 24, // 24 hours
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.NODE_ENV === "production",
     ...overrides,
   };
 }

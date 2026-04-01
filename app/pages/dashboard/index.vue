@@ -8,6 +8,15 @@
           <h1 class="text-lg font-bold">Email Service</h1>
         </div>
         <div class="flex items-center gap-3">
+          <UButton
+            color="primary"
+            variant="subtle"
+            icon="i-material-symbols-light-mark-email-read-outline"
+            :loading="sendingTestEmail"
+            @click="sendTestEmail"
+          >
+            Send Test Email
+          </UButton>
           <UButton to="/dashboard/keys" variant="ghost" color="neutral" icon="i-material-symbols-light-key-outline">
             API Keys
           </UButton>
@@ -125,6 +134,7 @@ import type { TableColumn } from "@nuxt/ui";
 definePageMeta({ layout: false, middleware: ["auth"] });
 
 const toast = useToast();
+const sendingTestEmail = ref(false);
 
 // Fetch data
 const { data: stats, refresh: refreshStats } = await useFetch<DashboardStats>("/api/dashboard/stats", {
@@ -149,6 +159,31 @@ const { data: recentEmails, refresh: refreshRecent } = await useFetch<any[]>("/a
 async function refresh() {
   await Promise.all([refreshStats(), refreshQueue(), refreshRecent()]);
   toast.add({ title: "Dashboard refreshed" });
+}
+
+async function sendTestEmail() {
+  sendingTestEmail.value = true;
+
+  try {
+    const result = await $fetch<{ message: string; provider: string; email: string }>("/api/dashboard/test-email", {
+      method: "POST",
+    });
+
+    await Promise.all([refreshStats(), refreshQueue(), refreshRecent()]);
+    toast.add({
+      title: "Test email queued",
+      description: `${result.message} via ${result.provider}.`,
+      icon: "i-material-symbols-light-mark-email-read-outline",
+    });
+  } catch (error: any) {
+    toast.add({
+      title: "Failed to queue test email",
+      description: error.data?.message || "The email service rejected the test email request.",
+      color: "error",
+    });
+  } finally {
+    sendingTestEmail.value = false;
+  }
 }
 
 // Auto-refresh every 30s
