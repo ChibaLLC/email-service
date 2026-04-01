@@ -17,6 +17,9 @@
           >
             Send Test Email
           </UButton>
+          <UButton to="/dashboard/listmonk" variant="ghost" color="neutral" icon="i-material-symbols-light-newsstand-outline">
+            Listmonk
+          </UButton>
           <UButton to="/dashboard/keys" variant="ghost" color="neutral" icon="i-material-symbols-light-key-outline">
             API Keys
           </UButton>
