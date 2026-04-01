@@ -11,6 +11,9 @@ export default defineNuxtConfig({
   css: ["~/assets/css/main.css"],
   vite: {
     plugins: [tailwind() as any],
+    optimizeDeps: {
+      include: ["@vue/devtools-core", "@vue/devtools-kit", "zod", "shiki"],
+    },
   },
   nitro: {
     rollupConfig: {

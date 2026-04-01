@@ -20,6 +20,13 @@ const COMPOSE_FILE = resolve(ROOT, "docker-compose.dev.yml");
 const ENV_FILE = resolve(ROOT, ".env");
 const ENV_EXAMPLE = resolve(ROOT, ".env.example");
 const PROJECT_NAME = "email-service-dev";
+const OPTIONAL_SERVICES = {
+  postal: {
+    composeFile: resolve(ROOT, "docker-compose.postal.yml"),
+    prepareCommand: 'node scripts/postal.mjs prepare',
+    label: 'Postal',
+  },
+};
 
 // ── Colors ──
 const c = {
@@ -101,33 +108,97 @@ function run(cmd, opts = {}) {
   }
 }
 
-function compose(args) {
-  return run(`docker compose -f "${COMPOSE_FILE}" -p ${PROJECT_NAME} --env-file "${ENV_FILE}" ${args}`);
+function getEnabledServices(args) {
+  const enabled = new Set();
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--with") {
+      const value = args[index + 1] || "";
+      value
+        .split(",")
+        .map((service) => service.trim())
+        .filter(Boolean)
+        .forEach((service) => enabled.add(service));
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--with=")) {
+      arg
+        .slice("--with=".length)
+        .split(",")
+        .map((service) => service.trim())
+        .filter(Boolean)
+        .forEach((service) => enabled.add(service));
+    }
+  }
+
+  return [...enabled];
+}
+
+function validateEnabledServices(services) {
+  const unsupported = services.filter((service) => !OPTIONAL_SERVICES[service]);
+  if (unsupported.length) {
+    err(`Unsupported optional service(s): ${unsupported.join(", ")}`);
+    err(`Supported optional services: ${Object.keys(OPTIONAL_SERVICES).join(", ")}`);
+    process.exit(1);
+  }
+}
+
+function getComposeFiles(enabledServices) {
+  return [COMPOSE_FILE, ...enabledServices.map((service) => OPTIONAL_SERVICES[service].composeFile)];
+}
+
+function compose(args, enabledServices = []) {
+  const files = getComposeFiles(enabledServices)
+    .map((file) => `-f "${file}"`)
+    .join(" ");
+
+  return run(`docker compose ${files} -p ${PROJECT_NAME} --env-file "${ENV_FILE}" ${args}`);
+}
+
+function prepareOptionalServices(enabledServices) {
+  for (const service of enabledServices) {
+    const config = OPTIONAL_SERVICES[service];
+    log(`Preparing ${config.label} overlay...`);
+    if (!run(config.prepareCommand)) {
+      err(`Failed to prepare ${config.label} overlay`);
+      process.exit(1);
+    }
+  }
 }
 
 // ──────────────────────────────────────────────────────────────
 // Actions
 // ──────────────────────────────────────────────────────────────
 
-function startInfra() {
-  log("Starting Postgres + Redis containers...");
-  if (!compose("up -d --wait")) {
+function startInfra(enabledServices = []) {
+  const serviceLabels = ["Postgres", "Redis", ...enabledServices.map((service) => OPTIONAL_SERVICES[service].label)];
+  log(`Starting ${serviceLabels.join(" + ")} containers...`);
+  if (!compose("up -d --wait", enabledServices)) {
     err("Failed to start Docker containers. Is Docker running?");
     process.exit(1);
   }
   ok("Postgres is ready on port " + (process.env.POSTGRES_PORT || "5432"));
   ok("Redis is ready on port " + (process.env.REDIS_PORT || "6379"));
+
+  if (enabledServices.includes("postal")) {
+    ok("Postal web is ready on port " + (process.env.POSTAL_WEB_PORT || "5000"));
+    ok("Postal MariaDB is ready on port " + (process.env.POSTAL_DB_PORT || "3307"));
+    ok("Postal SMTP is ready on port " + (process.env.POSTAL_SMTP_PORT || "2525"));
+  }
 }
 
-function stopInfra() {
+function stopInfra(enabledServices = []) {
   log("Stopping containers...");
-  compose("down");
+  compose("down", enabledServices);
   ok("Containers stopped");
 }
 
-function resetInfra() {
+function resetInfra(enabledServices = []) {
   warn("Destroying containers and volumes...");
-  compose("down -v");
+  compose("down -v", enabledServices);
   ok("Volumes destroyed");
 }
 
@@ -191,13 +262,18 @@ process.on("SIGTERM", cleanup);
 // ──────────────────────────────────────────────────────────────
 
 function main() {
-  const arg = process.argv[2];
+  const args = process.argv.slice(2);
+  const arg = args.find((value) => !value.startsWith("--with"));
+  const enabledServices = getEnabledServices(args);
+
+  validateEnabledServices(enabledServices);
 
   if (arg === "--help" || arg === "-h") {
     console.log(`
 Usage: node scripts/dev.mjs [option]
 
   (no args)   Start Docker infra + DB migrations + Nuxt dev
+  --with X     Enable optional overlays, e.g. --with postal
   --stop      Stop Docker containers
   --reset     Destroy volumes, restart, re-migrate
   --help      Show this help
@@ -206,15 +282,16 @@ Usage: node scripts/dev.mjs [option]
   }
 
   ensureEnv();
+  prepareOptionalServices(enabledServices);
 
   if (arg === "--stop") {
-    stopInfra();
+    stopInfra(enabledServices);
     process.exit(0);
   }
 
   if (arg === "--reset") {
-    resetInfra();
-    startInfra();
+    resetInfra(enabledServices);
+    startInfra(enabledServices);
     runMigrations();
     ok("Environment reset and ready");
     process.exit(0);
@@ -227,7 +304,7 @@ Usage: node scripts/dev.mjs [option]
   console.log(c.cyan("╚══════════════════════════════════════╝"));
   console.log("");
 
-  startInfra();
+  startInfra(enabledServices);
   runMigrations();
   startNuxt();
 

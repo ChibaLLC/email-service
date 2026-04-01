@@ -1,7 +1,7 @@
 import { env } from "std-env";
 import { z } from "zod";
 
-const providerNames = ["nodemailer", "resend", "sendgrid", "mailchimp"] as const;
+const providerNames = ["nodemailer", "resend", "sendgrid", "mailchimp", "postal"] as const;
 
 const providerNameSchema = z.enum(providerNames, {
   errorMap: () => ({
@@ -78,11 +78,27 @@ const mailchimpSchema = z.object({
   MAILCHIMP_TRANSACTIONAL_API_KEY: requiredString("MAILCHIMP_TRANSACTIONAL_API_KEY"),
 });
 
+const postalSchema = z.object({
+  DEFAULT_FROM: requiredEmail("DEFAULT_FROM"),
+  POSTAL_API_URL: requiredString("POSTAL_API_URL").refine((value) => {
+    try {
+      new URL(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }, {
+    message: "POSTAL_API_URL must be a valid URL",
+  }),
+  POSTAL_SERVER_API_KEY: requiredString("POSTAL_SERVER_API_KEY"),
+});
+
 const providerSchemas = {
   nodemailer: nodemailerSchema,
   resend: resendSchema,
   sendgrid: sendgridSchema,
   mailchimp: mailchimpSchema,
+  postal: postalSchema,
 } as const;
 
 export type EmailProviderName = (typeof providerNames)[number];
@@ -90,7 +106,8 @@ export type NodemailerConfig = z.infer<typeof nodemailerSchema> & { EMAIL_PROVID
 export type ResendConfig = z.infer<typeof resendSchema> & { EMAIL_PROVIDER: "resend" };
 export type SendGridConfig = z.infer<typeof sendgridSchema> & { EMAIL_PROVIDER: "sendgrid" };
 export type MailchimpConfig = z.infer<typeof mailchimpSchema> & { EMAIL_PROVIDER: "mailchimp" };
-export type EmailProviderConfig = NodemailerConfig | ResendConfig | SendGridConfig | MailchimpConfig;
+export type PostalConfig = z.infer<typeof postalSchema> & { EMAIL_PROVIDER: "postal" };
+export type EmailProviderConfig = NodemailerConfig | ResendConfig | SendGridConfig | MailchimpConfig | PostalConfig;
 
 type RawEmailProviderEnv = Record<string, string | undefined> & {
   EMAIL_PROVIDER?: string;
@@ -102,6 +119,8 @@ type RawEmailProviderEnv = Record<string, string | undefined> & {
   RESEND_API_KEY?: string;
   SENDGRID_API_KEY?: string;
   MAILCHIMP_TRANSACTIONAL_API_KEY?: string;
+  POSTAL_API_URL?: string;
+  POSTAL_SERVER_API_KEY?: string;
 };
 
 function readEmailProviderEnv(raw: RawEmailProviderEnv = env as RawEmailProviderEnv): RawEmailProviderEnv {
@@ -115,6 +134,8 @@ function readEmailProviderEnv(raw: RawEmailProviderEnv = env as RawEmailProvider
     RESEND_API_KEY: raw.RESEND_API_KEY,
     SENDGRID_API_KEY: raw.SENDGRID_API_KEY,
     MAILCHIMP_TRANSACTIONAL_API_KEY: raw.MAILCHIMP_TRANSACTIONAL_API_KEY,
+    POSTAL_API_URL: raw.POSTAL_API_URL,
+    POSTAL_SERVER_API_KEY: raw.POSTAL_SERVER_API_KEY,
   };
 }
 

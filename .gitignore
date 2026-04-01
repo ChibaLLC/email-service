@@ -23,3 +23,6 @@ logs
 .env.*
 !.env.example
 .pnpm-store
+
+# Generated Postal dev config
+docker/postal/config/

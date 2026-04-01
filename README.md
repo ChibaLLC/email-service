@@ -7,7 +7,13 @@ Production-ready email service with queue processing, provider-agnostic architec
 ### 1. Docker Compose (PostgreSQL + Redis)
 
 ```bash
-docker compose up -d
+pnpm dev:start
+```
+
+Optional Postal overlay:
+
+```bash
+pnpm dev:start:postal
 ```
 
 ### 2. Local Development
@@ -44,7 +50,8 @@ pnpm dev            # Start dev server
 │  /dashboard  │  POST /api/key│  ├─ NodemailerProvider    │
 │              │  GET  /api/*  │  ├─ ResendProvider        │
 │              │               │  ├─ SendGridProvider      │
-│              │               │  └─ MailchimpProvider     │
+│              │               │  ├─ MailchimpProvider     │
+│              │               │  └─ PostalProvider        │
 ├──────────────┴───────────────┴───────────────────────────┤
 │           PostgreSQL          │         Redis             │
 │    (api_keys, emails)         │   (BullMQ job queue)      │
@@ -163,6 +170,29 @@ await mailchimp.messages.send({
 });
 ```
 
+## Using Postal
+
+Postal setup is documented in detail in [docs/postal/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/postal/README.md).
+
+Minimum app configuration:
+
+```bash
+EMAIL_PROVIDER=postal
+POSTAL_API_URL=http://localhost:5000
+POSTAL_SERVER_API_KEY=postal_server_api_key
+DEFAULT_FROM=verified-sender@example.com
+```
+
+For local development with the built-in overlay:
+
+```bash
+pnpm dev:start:postal
+```
+
+Use the dedicated guide for the full Postal bootstrapping flow, DNS records, Postal UI setup, and delivery requirements.
+
+See [docs/postal/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/postal/README.md).
+
 ## Startup Validation
 
 The server validates the selected email provider configuration during Nitro startup. If the selected provider is missing required environment variables, startup fails with a provider-specific error message that lists the missing or invalid keys.
@@ -176,6 +206,13 @@ Authenticated dashboard users can queue a test email to their own login address 
 | Script             | Description              |
 | ------------------ | ------------------------ |
 | `pnpm dev`         | Start development server |
+| `pnpm dev:start`   | Start Postgres + Redis + Nuxt via the local orchestrator |
+| `pnpm dev:start:postal` | Start the base dev stack plus the Postal overlay |
+| `pnpm postal:prepare` | Generate local Postal config files |
+| `pnpm postal:prepare:force` | Regenerate Postal config and signing key |
+| `pnpm postal:preview` | Preview the generated Postal config without writing it |
+| `pnpm postal:up`   | Start the base dev stack and Postal overlay without Nuxt |
+| `pnpm postal:down` | Stop the base dev stack and Postal overlay |
 | `pnpm build`       | Build for production     |
 | `pnpm db:push`     | Push schema to database  |
 | `pnpm db:generate` | Generate migrations      |

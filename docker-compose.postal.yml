@@ -1,0 +1,90 @@
+# Optional Postal local overlay.
+# Use with docker-compose.dev.yml through `pnpm dev:start:postal` or `pnpm postal:up`.
+
+services:
+  postal-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${POSTAL_DB_NAME:-postal}
+      MARIADB_ROOT_PASSWORD: ${POSTAL_DB_ROOT_PASSWORD:-postal}
+    ports:
+      - "${POSTAL_DB_PORT:-3307}:3306"
+    volumes:
+      - postal_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping --host=127.0.0.1 --user=root --password=${POSTAL_DB_ROOT_PASSWORD:-postal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postal-web:
+    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
+    restart: unless-stopped
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    entrypoint: ["/docker-entrypoint.sh"]
+    command: ["bundle", "exec", "puma", "-C", "config/puma.rb"]
+    environment:
+      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
+      POSTAL_SIGNING_KEY_PATH: /config/signing.key
+      WAIT_FOR_TIMEOUT: 90
+      WAIT_FOR_TARGETS: postal-db:3306
+      BIND_ADDRESS: 0.0.0.0
+      PORT: 5000
+    ports:
+      - "${POSTAL_WEB_PORT:-5000}:5000"
+    volumes:
+      - ./docker/postal/config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postal-worker:
+    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
+    restart: unless-stopped
+    depends_on:
+      postal-db:
+        condition: service_healthy
+      postal-web:
+        condition: service_started
+    entrypoint: ["/docker-entrypoint.sh"]
+    command: ["bundle", "exec", "ruby", "script/worker.rb"]
+    environment:
+      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
+      POSTAL_SIGNING_KEY_PATH: /config/signing.key
+      WAIT_FOR_TIMEOUT: 90
+      WAIT_FOR_TARGETS: postal-db:3306
+    volumes:
+      - ./docker/postal/config:/config
+
+  postal-smtp:
+    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
+    restart: unless-stopped
+    depends_on:
+      postal-db:
+        condition: service_healthy
+      postal-web:
+        condition: service_started
+    entrypoint: ["/docker-entrypoint.sh"]
+    command: ["bundle", "exec", "ruby", "script/smtp_server.rb"]
+    environment:
+      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
+      POSTAL_SIGNING_KEY_PATH: /config/signing.key
+      WAIT_FOR_TIMEOUT: 90
+      WAIT_FOR_TARGETS: postal-db:3306
+    ports:
+      - "${POSTAL_SMTP_PORT:-2525}:25"
+    volumes:
+      - ./docker/postal/config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 25"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postal_db_data:

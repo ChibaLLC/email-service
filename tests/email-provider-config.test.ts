@@ -58,6 +58,20 @@ describe("email provider config", () => {
     expect(getDefaultFromAddress(config)).toBe("onboarding@resend.dev");
   });
 
+  it("validates postal config", () => {
+    const config = parseEmailProviderConfig("postal", {
+      DEFAULT_FROM: "team@ifkafin.com",
+      POSTAL_API_URL: "http://localhost:5000",
+      POSTAL_SERVER_API_KEY: "postal_test_key",
+    });
+
+    expect(config).toMatchObject({
+      EMAIL_PROVIDER: "postal",
+      DEFAULT_FROM: "team@ifkafin.com",
+      POSTAL_API_URL: "http://localhost:5000",
+    });
+  });
+
   it("rejects unsupported EMAIL_PROVIDER values", () => {
     expect(() =>
       getSelectedEmailProviderName({

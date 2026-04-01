@@ -1,5 +1,5 @@
 # Dev-only infrastructure services (Postgres + Redis)
-# Used by scripts/dev.sh — the Nuxt app runs natively via `nuxt dev`
+# Used by scripts/dev.mjs — the Nuxt app runs natively via `nuxt dev`
 
 services:
   postgres:

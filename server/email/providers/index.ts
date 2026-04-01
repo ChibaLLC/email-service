@@ -2,6 +2,7 @@ import type { EmailProvider } from "../types";
 import { getSelectedEmailProviderName } from "../config";
 import { MailchimpProvider } from "./mailchimp";
 import { NodemailerProvider } from "./nodemailer";
+import { PostalProvider } from "./postal";
 import { ResendProvider } from "./resend";
 import { SendGridProvider } from "./sendgrid";
 
@@ -25,9 +26,12 @@ export function getEmailProvider(): EmailProvider {
     case "mailchimp":
       _provider = new MailchimpProvider();
       break;
+    case "postal":
+      _provider = new PostalProvider();
+      break;
     // Add new providers here:
     default:
-      throw new Error(`Unknown email provider: ${providerName}. Supported: nodemailer, resend, sendgrid, mailchimp`);
+      throw new Error(`Unknown email provider: ${providerName}. Supported: nodemailer, resend, sendgrid, mailchimp, postal`);
   }
 
   return _provider;
