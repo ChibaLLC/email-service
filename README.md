@@ -193,6 +193,16 @@ Use the dedicated guide for the full Postal bootstrapping flow, DNS records, Pos
 
 See [docs/postal/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/postal/README.md).
 
+## Using Listmonk
+
+Listmonk is integrated here as a proxied mailing-list service, not as an email provider.
+
+The containerized stack in [docker-compose.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.yml) includes Listmonk by default. The native-dev workflow still uses the Listmonk overlay so you can run Nuxt outside Docker with `pnpm dev:start:listmonk`.
+
+Use the dedicated guide for the Listmonk overlay, proxy configuration, and dashboard API usage.
+
+See [docs/listmonk/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/listmonk/README.md).
+
 ## Startup Validation
 
 The server validates the selected email provider configuration during Nitro startup. If the selected provider is missing required environment variables, startup fails with a provider-specific error message that lists the missing or invalid keys.
@@ -206,8 +216,16 @@ Authenticated dashboard users can queue a test email to their own login address 
 | Script             | Description              |
 | ------------------ | ------------------------ |
 | `pnpm dev`         | Start development server |
+| `pnpm dev:start:all` | Start the app with both Postal and Listmonk overlays |
 | `pnpm dev:start`   | Start Postgres + Redis + Nuxt via the local orchestrator |
+| `pnpm dev:start:listmonk` | Start the base dev stack plus the Listmonk overlay |
 | `pnpm dev:start:postal` | Start the base dev stack plus the Postal overlay |
+| `pnpm listmonk:prepare` | Generate local Listmonk config files |
+| `pnpm listmonk:prepare:force` | Regenerate Listmonk config files |
+| `pnpm listmonk:preview` | Preview the generated Listmonk config without writing it |
+| `pnpm listmonk:up` | Start the base dev stack and Listmonk overlay without Nuxt |
+| `pnpm listmonk:down` | Stop the base dev stack and Listmonk overlay |
+| `GET/POST /api/dashboard/listmonk/**` | Proxy authenticated dashboard requests to the Listmonk API |
 | `pnpm postal:prepare` | Generate local Postal config files |
 | `pnpm postal:prepare:force` | Regenerate Postal config and signing key |
 | `pnpm postal:preview` | Preview the generated Postal config without writing it |

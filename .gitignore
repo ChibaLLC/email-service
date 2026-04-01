@@ -26,3 +26,7 @@ logs
 
 # Generated Postal dev config
 docker/postal/config/
+
+# Generated Listmonk dev config and data
+docker/listmonk/config/
+docker/listmonk/uploads/

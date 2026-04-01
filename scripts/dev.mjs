@@ -21,6 +21,11 @@ const ENV_FILE = resolve(ROOT, ".env");
 const ENV_EXAMPLE = resolve(ROOT, ".env.example");
 const PROJECT_NAME = "email-service-dev";
 const OPTIONAL_SERVICES = {
+  listmonk: {
+    composeFile: resolve(ROOT, "docker-compose.listmonk.yml"),
+    prepareCommand: 'node scripts/listmonk.mjs prepare',
+    label: 'Listmonk',
+  },
   postal: {
     composeFile: resolve(ROOT, "docker-compose.postal.yml"),
     prepareCommand: 'node scripts/postal.mjs prepare',
@@ -187,6 +192,11 @@ function startInfra(enabledServices = []) {
     ok("Postal web is ready on port " + (process.env.POSTAL_WEB_PORT || "5000"));
     ok("Postal MariaDB is ready on port " + (process.env.POSTAL_DB_PORT || "3307"));
     ok("Postal SMTP is ready on port " + (process.env.POSTAL_SMTP_PORT || "2525"));
+  }
+
+  if (enabledServices.includes("listmonk")) {
+    ok("Listmonk web is ready on port " + (process.env.LISTMONK_APP_PORT || "9000"));
+    ok("Listmonk Postgres is ready on port " + (process.env.LISTMONK_DB_PORT || "9432"));
   }
 }
 
