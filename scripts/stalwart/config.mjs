@@ -29,6 +29,50 @@ export function buildStalwartConfig(env) {
   const proxyTrustedNetworks = parseList(env.STALWART_PROXY_TRUSTED_NETWORKS);
   const httpUseXForwarded = env.STALWART_HTTP_USE_X_FORWARDED === "true";
   const resolvedAcmeDomains = acmeDomains.length > 0 ? acmeDomains : [hostname];
+
+  // DNS-01 provider settings
+  const acmeDnsProvider = env.STALWART_ACME_DNS_PROVIDER || "";
+  const acmeDnsPollingInterval = env.STALWART_ACME_DNS_POLLING_INTERVAL || "15s";
+  const acmeDnsPropagationTimeout = env.STALWART_ACME_DNS_PROPAGATION_TIMEOUT || "1m";
+  const acmeDnsTtl = env.STALWART_ACME_DNS_TTL || "5m";
+  const acmeDnsOrigin = env.STALWART_ACME_DNS_ORIGIN || "";
+
+  let dns01Config = "";
+  if (acmeEnabled && acmeChallenge === "dns-01" && acmeDnsProvider) {
+    const lines = [];
+    lines.push(`provider = ${JSON.stringify(acmeDnsProvider)}`);
+    lines.push(`polling-interval = ${JSON.stringify(acmeDnsPollingInterval)}`);
+    lines.push(`propagation-timeout = ${JSON.stringify(acmeDnsPropagationTimeout)}`);
+    lines.push(`ttl = ${JSON.stringify(acmeDnsTtl)}`);
+    if (acmeDnsOrigin) {
+      lines.push(`origin = ${JSON.stringify(acmeDnsOrigin)}`);
+    }
+
+    if (acmeDnsProvider === "cloudflare") {
+      const cfSecret = env.STALWART_ACME_DNS_CF_SECRET || "";
+      const cfEmail = env.STALWART_ACME_DNS_CF_EMAIL || "";
+      const cfTimeout = env.STALWART_ACME_DNS_CF_TIMEOUT || "30s";
+      if (cfSecret) lines.push(`secret = ${JSON.stringify(cfSecret)}`);
+      if (cfEmail) lines.push(`email = ${JSON.stringify(cfEmail)}`);
+      lines.push(`timeout = ${JSON.stringify(cfTimeout)}`);
+    } else if (acmeDnsProvider === "rfc2136-tsig") {
+      const rfcHost = env.STALWART_ACME_DNS_RFC_HOST || "";
+      const rfcPort = env.STALWART_ACME_DNS_RFC_PORT || "53";
+      const rfcProtocol = env.STALWART_ACME_DNS_RFC_PROTOCOL || "udp";
+      const rfcAlgorithm = env.STALWART_ACME_DNS_RFC_ALGORITHM || "hmac-sha256";
+      const rfcKey = env.STALWART_ACME_DNS_RFC_KEY || "";
+      const rfcSecret = env.STALWART_ACME_DNS_RFC_SECRET || "";
+      if (rfcHost) lines.push(`host = ${JSON.stringify(rfcHost)}`);
+      lines.push(`port = ${parseInt(rfcPort, 10)}`);
+      lines.push(`protocol = ${JSON.stringify(rfcProtocol)}`);
+      lines.push(`tsig-algorithm = ${JSON.stringify(rfcAlgorithm)}`);
+      if (rfcKey) lines.push(`key = ${JSON.stringify(rfcKey)}`);
+      if (rfcSecret) lines.push(`secret = ${JSON.stringify(rfcSecret)}`);
+    }
+
+    dns01Config = "\n" + lines.join("\n") + "\n";
+  }
+
   const acmeConfig = acmeEnabled
     ? `
 
@@ -43,8 +87,7 @@ ${
 }domains = ${JSON.stringify(resolvedAcmeDomains)}
 cache = ${JSON.stringify(acmeCache)}
 renew-before = ${JSON.stringify(acmeRenewBefore)}
-default = ${acmeDefault}
-`
+default = ${acmeDefault}${dns01Config}`
     : "";
   const httpConfig = httpUseXForwarded
     ? `

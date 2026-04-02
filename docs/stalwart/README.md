@@ -114,6 +114,20 @@ Important production env keys in [.env.example](../../.env.example):
 - `STALWART_ACME_CACHE`
 - `STALWART_ACME_RENEW_BEFORE`
 - `STALWART_ACME_DEFAULT`
+- `STALWART_ACME_DNS_PROVIDER`
+- `STALWART_ACME_DNS_POLLING_INTERVAL`
+- `STALWART_ACME_DNS_PROPAGATION_TIMEOUT`
+- `STALWART_ACME_DNS_TTL`
+- `STALWART_ACME_DNS_ORIGIN`
+- `STALWART_ACME_DNS_CF_SECRET`
+- `STALWART_ACME_DNS_CF_EMAIL`
+- `STALWART_ACME_DNS_CF_TIMEOUT`
+- `STALWART_ACME_DNS_RFC_HOST`
+- `STALWART_ACME_DNS_RFC_PORT`
+- `STALWART_ACME_DNS_RFC_PROTOCOL`
+- `STALWART_ACME_DNS_RFC_ALGORITHM`
+- `STALWART_ACME_DNS_RFC_KEY`
+- `STALWART_ACME_DNS_RFC_SECRET`
 - `STALWART_PROXY_TRUSTED_NETWORKS`
 - `STALWART_PROXY_AUTODETECT`
 - `STALWART_DOCKER_SOCKET_PATH`
@@ -135,9 +149,79 @@ Important production env keys in [.env.example](../../.env.example):
 
 ## Automatic TLS With ACME
 
-The generated Stalwart config can now emit an optional Let's Encrypt ACME section.
+The generated Stalwart config can emit an optional Let's Encrypt ACME section. Without ACME or an explicit certificate, Stalwart falls back to a self-signed certificate — remote servers will reject STARTTLS with `UnknownIssuer`.
 
-Set these values in `.env` to enable it:
+### Challenge Types
+
+Stalwart supports three ACME challenge types:
+
+| Challenge | Requires | Supports Wildcards | Best For |
+|-----------|----------|-------------------|----------|
+| `tls-alpn-01` | Port 443 reachable by Let's Encrypt | No | Stalwart directly on the internet |
+| `http-01` | Port 80 reachable by Let's Encrypt | No | Servers with port 80 available |
+| `dns-01` | DNS provider API credentials | Yes | Behind a reverse proxy (Traefik, Caddy, etc.) |
+
+**`dns-01` is recommended** when Stalwart runs behind a reverse proxy like Traefik or Dokploy, because no specific ports need to be open for the ACME challenge.
+
+### DNS-01 with Cloudflare
+
+#### Creating a Cloudflare API Token
+
+1. Log in to the [Cloudflare dashboard](https://dash.cloudflare.com/).
+2. Click your profile icon (top right) and go to **My Profile** → **API Tokens**.
+3. Click **Create Token**.
+4. Use the **Edit zone DNS** template, or create a custom token with these permissions:
+   - **Permissions**: Zone → DNS → Edit
+   - **Zone Resources**: Include → Specific zone → select your domain (e.g. `finueva.com`)
+5. Click **Continue to summary** → **Create Token**.
+6. Copy the token — this is your `STALWART_ACME_DNS_CF_SECRET`.
+
+Alternatively, you can use a **Global API Key** (less secure, not recommended):
+1. Go to **My Profile** → **API Tokens** → **API Keys** section.
+2. Click **View** next to **Global API Key**.
+3. Set `STALWART_ACME_DNS_CF_SECRET` to the global API key.
+4. Set `STALWART_ACME_DNS_CF_EMAIL` to the email address on your Cloudflare account.
+
+```bash
+STALWART_ACME_ENABLED=true
+STALWART_ACME_DIRECTORY=https://acme-v02.api.letsencrypt.org/directory
+STALWART_ACME_CHALLENGE=dns-01
+STALWART_ACME_CONTACT=postmaster@example.com
+STALWART_ACME_DOMAINS=stalwart.example.com
+STALWART_ACME_DEFAULT=true
+
+STALWART_ACME_DNS_PROVIDER=cloudflare
+STALWART_ACME_DNS_CF_SECRET=your-cloudflare-api-token
+# Optional: use email + global API key instead of scoped token
+# STALWART_ACME_DNS_CF_EMAIL=you@example.com
+```
+
+### DNS-01 with RFC2136 (TSIG)
+
+For BIND, PowerDNS, or other DNS servers supporting dynamic updates:
+
+```bash
+STALWART_ACME_ENABLED=true
+STALWART_ACME_DIRECTORY=https://acme-v02.api.letsencrypt.org/directory
+STALWART_ACME_CHALLENGE=dns-01
+STALWART_ACME_CONTACT=postmaster@example.com
+STALWART_ACME_DOMAINS=stalwart.example.com
+STALWART_ACME_DEFAULT=true
+
+STALWART_ACME_DNS_PROVIDER=rfc2136-tsig
+STALWART_ACME_DNS_RFC_HOST=ns1.example.com
+STALWART_ACME_DNS_RFC_PORT=53
+STALWART_ACME_DNS_RFC_PROTOCOL=udp
+STALWART_ACME_DNS_RFC_ALGORITHM=hmac-sha256
+STALWART_ACME_DNS_RFC_KEY=acme-update-key
+STALWART_ACME_DNS_RFC_SECRET=base64-encoded-tsig-secret
+```
+
+### TLS-ALPN-01 (direct exposure)
+
+> **TODO**: The config generator fully supports `dns-01` with Cloudflare and RFC2136. Support for `tls-alpn-01` and `http-01` works at the basic ACME level (directory, challenge, contact, domains), but the generator does not yet handle their specific deployment needs — publishing port 443 or 80, or compose overrides for direct exposure. Extend the generator and compose when these challenge types are needed.
+
+Use this only when Stalwart can receive connections on port 443 directly:
 
 ```bash
 STALWART_ACME_ENABLED=true
@@ -145,23 +229,21 @@ STALWART_ACME_DIRECTORY=https://acme-v02.api.letsencrypt.org/directory
 STALWART_ACME_CHALLENGE=tls-alpn-01
 STALWART_ACME_CONTACT=postmaster@example.com
 STALWART_ACME_DOMAINS=stalwart.example.com
-STALWART_ACME_CACHE=%{BASE_PATH}%/etc/acme
-STALWART_ACME_RENEW_BEFORE=30d
 STALWART_ACME_DEFAULT=true
 ```
 
-Important constraint: `tls-alpn-01` only works if Stalwart itself can answer the ACME challenge on port `443` for the names in `STALWART_ACME_DOMAINS`.
+If Traefik or another proxy owns port 443, `tls-alpn-01` will fail silently and Stalwart will keep using its self-signed certificate.
 
-In this repo, the `stalwart` service currently publishes the mail ports directly but does not publish `443`. If Traefik or Dokploy already terminates HTTPS for that hostname, Stalwart will not receive the `tls-alpn-01` challenge unless you explicitly route or pass through port `443` to Stalwart.
+### Optional DNS-01 tuning
 
-For a reverse-proxy-managed deployment, use one of these models:
+These apply to both Cloudflare and RFC2136:
 
-1. Let Stalwart manage its own certificates and make `443` reach Stalwart for ACME validation.
-2. Keep web TLS in Traefik and switch Stalwart ACME to `dns-01` instead of `tls-alpn-01`.
-
-This repo currently generates the common ACME settings shown in the Stalwart Let's Encrypt example: directory, challenge, contact, domains, cache, renew-before, and default. If you want `dns-01`, you will also need to extend the generator with your provider-specific Stalwart settings such as `provider`, `secret`, `origin`, or RFC2136 parameters.
-
-Enabling ACME here is the right fix for the SMTP certificate problem you observed, because the current Stalwart config enables TLS listeners but does not define any certificate source. Without ACME or an explicit certificate configuration, Stalwart falls back to a self-signed certificate.
+```bash
+STALWART_ACME_DNS_POLLING_INTERVAL=15s   # How often to check DNS propagation
+STALWART_ACME_DNS_PROPAGATION_TIMEOUT=1m # Max wait for DNS propagation
+STALWART_ACME_DNS_TTL=5m                 # TTL for the _acme-challenge TXT record
+STALWART_ACME_DNS_ORIGIN=example.com     # DNS zone origin (auto-detected if omitted)
+```
 
 ## Reverse Proxy Examples
 
