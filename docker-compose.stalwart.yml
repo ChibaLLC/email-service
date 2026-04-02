@@ -105,9 +105,6 @@ services:
       - "110:110"
       - "995:995"
       - "4190:4190"
-    expose:
-      - "8080"
-      - "443"
     volumes:
       - stalwart_data:/opt/stalwart
 
