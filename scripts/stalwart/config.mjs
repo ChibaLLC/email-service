@@ -87,7 +87,8 @@ ${
 }domains = ${JSON.stringify(resolvedAcmeDomains)}
 cache = ${JSON.stringify(acmeCache)}
 renew-before = ${JSON.stringify(acmeRenewBefore)}
-default = ${acmeDefault}${dns01Config}`
+default = ${acmeDefault}
+${dns01Config}`
     : "";
   const httpConfig = httpUseXForwarded
     ? `
