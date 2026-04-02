@@ -24,6 +24,14 @@ services:
     image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
     user: "0:0"
     restart: "no"
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    environment:
+      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
+      POSTAL_SIGNING_KEY_PATH: /config/signing.key
+      WAIT_FOR_TIMEOUT: 90
+      WAIT_FOR_TARGETS: postal-db:3306
     command:
       - /bin/sh
       - -ec
@@ -73,6 +81,10 @@ services:
 
         chown 999:999 /config/postal.yml
         chmod 640 /config/postal.yml
+
+        # Ensure Postal schema and migrations are applied before web/worker/smtp start.
+        postal initialize
+        postal update
     volumes:
       - postal_config_data:/config
 
