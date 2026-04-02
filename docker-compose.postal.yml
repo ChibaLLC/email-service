@@ -1,6 +1,24 @@
 # Optional Postal local overlay.
 # Use with docker-compose.dev.yml through `pnpm dev:start:postal` or `pnpm postal:up`.
 
+x-postal-runtime-common: &postal-runtime-common
+  image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
+  restart: unless-stopped
+  entrypoint: ["/docker-entrypoint.sh"]
+  environment:
+    POSTAL_CONFIG_FILE_PATH: /config/postal.yml
+    POSTAL_SIGNING_KEY_PATH: /config/signing.key
+    WAIT_FOR_TIMEOUT: 90
+    WAIT_FOR_TARGETS: postal-db:3306
+  volumes:
+    - postal_config_data:/config
+
+x-postal-depends-on: &postal-depends-on
+  postal-db:
+    condition: service_healthy
+  postal-init:
+    condition: service_completed_successfully
+
 services:
   postal-init:
     image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
@@ -75,26 +93,15 @@ services:
       retries: 10
 
   postal-web:
-    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
-    restart: unless-stopped
+    <<: *postal-runtime-common
     depends_on:
-      postal-db:
-        condition: service_healthy
-      postal-init:
-        condition: service_completed_successfully
-    entrypoint: ["/docker-entrypoint.sh"]
+      <<: *postal-depends-on
     command: ["bundle", "exec", "puma", "-C", "config/puma.rb"]
     environment:
-      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
-      POSTAL_SIGNING_KEY_PATH: /config/signing.key
-      WAIT_FOR_TIMEOUT: 90
-      WAIT_FOR_TARGETS: postal-db:3306
       BIND_ADDRESS: 0.0.0.0
       PORT: 5000
     expose:
       - "5000"
-    volumes:
-      - postal_config_data:/config
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 5000"]
       interval: 10s
@@ -102,46 +109,22 @@ services:
       retries: 10
 
   postal-worker:
-    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
-    restart: unless-stopped
+    <<: *postal-runtime-common
     depends_on:
-      postal-db:
-        condition: service_healthy
+      <<: *postal-depends-on
       postal-web:
         condition: service_started
-      postal-init:
-        condition: service_completed_successfully
-    entrypoint: ["/docker-entrypoint.sh"]
     command: ["bundle", "exec", "ruby", "script/worker.rb"]
-    environment:
-      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
-      POSTAL_SIGNING_KEY_PATH: /config/signing.key
-      WAIT_FOR_TIMEOUT: 90
-      WAIT_FOR_TARGETS: postal-db:3306
-    volumes:
-      - postal_config_data:/config
 
   postal-smtp:
-    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
-    restart: unless-stopped
+    <<: *postal-runtime-common
     depends_on:
-      postal-db:
-        condition: service_healthy
+      <<: *postal-depends-on
       postal-web:
         condition: service_started
-      postal-init:
-        condition: service_completed_successfully
-    entrypoint: ["/docker-entrypoint.sh"]
     command: ["bundle", "exec", "ruby", "script/smtp_server.rb"]
-    environment:
-      POSTAL_CONFIG_FILE_PATH: /config/postal.yml
-      POSTAL_SIGNING_KEY_PATH: /config/signing.key
-      WAIT_FOR_TIMEOUT: 90
-      WAIT_FOR_TARGETS: postal-db:3306
     expose:
       - "25"
-    volumes:
-      - postal_config_data:/config
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 25"]
       interval: 10s

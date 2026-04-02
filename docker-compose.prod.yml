@@ -1,0 +1,64 @@
+﻿services:
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  listmonk-db:
+    extends:
+      file: docker-compose.yml
+      service: listmonk-db
+
+  listmonk-init:
+    extends:
+      file: docker-compose.yml
+      service: listmonk-init
+
+  listmonk-app:
+    extends:
+      file: docker-compose.yml
+      service: listmonk-app
+
+  app:
+    extends:
+      file: docker-compose.yml
+      service: app
+
+  postal-init:
+    extends:
+      file: docker-compose.postal.yml
+      service: postal-init
+
+  postal-db:
+    extends:
+      file: docker-compose.postal.yml
+      service: postal-db
+
+  postal-web:
+    extends:
+      file: docker-compose.postal.yml
+      service: postal-web
+
+  postal-worker:
+    extends:
+      file: docker-compose.postal.yml
+      service: postal-worker
+
+  postal-smtp:
+    extends:
+      file: docker-compose.postal.yml
+      service: postal-smtp
+
+volumes:
+  postgres_data:
+  redis_data:
+  listmonk_db_data:
+  listmonk_config_data:
+  listmonk_uploads_data:
+  postal_db_data:
+  postal_config_data:
