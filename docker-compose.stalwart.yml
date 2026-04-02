@@ -50,6 +50,12 @@ services:
   stalwart-minio-init:
     image: minio/mc:latest
     restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        until mc alias set local http://stalwart-minio:9000 "$$STALWART_MINIO_ROOT_USER" "$$STALWART_MINIO_ROOT_PASSWORD"; do sleep 2; done;
+        mc mb --ignore-existing "local/$$STALWART_MINIO_BUCKET"
     depends_on:
       stalwart-minio:
         condition: service_started
@@ -57,14 +63,6 @@ services:
       STALWART_MINIO_ROOT_USER: ${STALWART_MINIO_ROOT_USER:-stalwart}
       STALWART_MINIO_ROOT_PASSWORD: ${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
       STALWART_MINIO_BUCKET: ${STALWART_MINIO_BUCKET:-stalwart}
-    command:
-      - /bin/sh
-      - -ec
-      - |
-        until mc alias set local http://stalwart-minio:9000 "$${STALWART_MINIO_ROOT_USER}" "$${STALWART_MINIO_ROOT_PASSWORD}"; do
-          sleep 2
-        done
-        mc mb --ignore-existing "local/$${STALWART_MINIO_BUCKET}"
 
   stalwart-config:
     image: node:20-alpine

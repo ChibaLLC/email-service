@@ -1,1 +1,1 @@
-docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up
+docker compose -f ./docker-compose.prod.yml  --env-file .env up
