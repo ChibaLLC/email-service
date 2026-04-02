@@ -27,7 +27,7 @@ COPY --from=builder /app/node_modules node_modules
 COPY --from=builder /app/drizzle drizzle
 COPY --from=builder /app/drizzle.config.ts .
 COPY docker-entrypoint.sh .
-RUN chmod +x docker-entrypoint.sh
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 EXPOSE 3000
 

@@ -4,18 +4,24 @@
 services:
   postal-init:
     image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
+    user: "0:0"
     restart: "no"
     command:
       - /bin/sh
       - -ec
       - |
         mkdir -p /config
+        chown 999:999 /config
+
         if [ ! -f /config/signing.key ]; then
           if command -v openssl >/dev/null 2>&1; then
             openssl genrsa -out /config/signing.key 2048
           else
             ruby -ropenssl -e "key = OpenSSL::PKey::RSA.new(2048); File.write('/config/signing.key', key.to_pem)"
           fi
+
+          chown 999:999 /config/signing.key
+          chmod 600 /config/signing.key
         fi
 
         cat > /config/postal.yml <<EOF
@@ -46,6 +52,9 @@ services:
           environment: development
           secret_key: ${POSTAL_RAILS_SECRET_KEY:-change-me-in-production}
         EOF
+
+        chown 999:999 /config/postal.yml
+        chmod 640 /config/postal.yml
     volumes:
       - postal_config_data:/config
 
