@@ -29,7 +29,7 @@ This starts the full production stack, including:
 - dedicated MinIO for blob/object storage
 - one-shot init services that create the MinIO bucket and write the Stalwart `config.toml`
 
-The Stalwart services publish the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, `4190`, `8080`, and `443`.
+The Stalwart services publish the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, and `4190`.
 
 If you prefer detached startup, use `docker compose -f ./docker-compose.prod.yml --env-file .env up -d`.
 
@@ -58,6 +58,11 @@ Your administrator account is 'admin' with password '...'
 ```
 
 Use those credentials to sign in to the Stalwart web UI.
+
+If you are trying to access the web UI from outside Docker, you need one of these setups:
+
+- publish `8080` or `443` from the `stalwart` service to the host
+- route a public hostname to the internal Stalwart web port through your reverse proxy
 
 ## Using Stalwart With Postal
 
