@@ -43,19 +43,16 @@ That script stops common Linux mail services, stops Docker containers already pu
 
 ## First Login
 
-Stalwart creates an initial admin account automatically on first boot. Read it from the container logs:
+This repo now configures a deterministic fallback admin user in the generated Stalwart config.
 
-For the consolidated production stack:
+Set these values in `.env` before first startup:
 
 ```bash
-docker compose -f ./docker-compose.prod.yml --env-file .env logs stalwart
+STALWART_ADMIN_USER=admin
+STALWART_ADMIN_PASSWORD=change-this-password
 ```
 
-The logs include a line like:
-
-```text
-Your administrator account is 'admin' with password '...'
-```
+The same keys are documented in [../../.env.example](../../.env.example).
 
 Use those credentials to sign in to the Stalwart web UI.
 
@@ -102,6 +99,8 @@ Stalwart generates its own recommended DNS records per configured domain, includ
 Important production env keys in [.env.example](../../.env.example):
 
 - `STALWART_HOSTNAME`
+- `STALWART_ADMIN_USER`
+- `STALWART_ADMIN_PASSWORD`
 - `STALWART_DB_USER`
 - `STALWART_DB_PASSWORD`
 - `STALWART_DB_NAME`

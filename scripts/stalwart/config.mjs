@@ -9,6 +9,8 @@ export function buildStalwartConfig(env) {
   const minioPassword = env.STALWART_MINIO_ROOT_PASSWORD || "stalwart-minio";
   const minioEndpoint = env.STALWART_MINIO_ENDPOINT || "http://stalwart-minio:9000";
   const hostname = env.STALWART_HOSTNAME || "mail.example.com";
+  const adminUser = env.STALWART_ADMIN_USER || "admin";
+  const adminPassword = env.STALWART_ADMIN_PASSWORD || "change-me-stalwart-admin";
 
   return `[server]
 hostname = "${hostname}"
@@ -95,5 +97,9 @@ timeout = "10s"
 [directory."internal"]
 type = "internal"
 store = "postgresql"
+
+[authentication.fallback-admin]
+user = "${adminUser}"
+secret = "${adminPassword}"
 `;
 }
