@@ -7,6 +7,7 @@ This guide covers the Stalwart-specific setup for this repo: running the product
 - A production Stalwart compose definition in [docker-compose.stalwart.yml](../../docker-compose.stalwart.yml)
 - A consolidated production compose file in [docker-compose.prod.yml](../../docker-compose.prod.yml) that includes the base app services plus Stalwart, Postal, and Listmonk
 - A Stalwart config generator in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) and [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs)
+- A helper cleanup script in [scripts/stalwart/free-ports.sh](../../scripts/stalwart/free-ports.sh) for freeing the standard Stalwart mail ports on a server before startup
 - App integration through the existing nodemailer provider in [server/email/providers/nodemailer.ts](../../server/email/providers/nodemailer.ts)
 
 ## Quick Start
@@ -31,6 +32,14 @@ This starts the full production stack, including:
 The Stalwart services publish the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, `4190`, `8080`, and `443`.
 
 If you prefer detached startup, use `docker compose -f ./docker-compose.prod.yml --env-file .env up -d`.
+
+If startup fails because one of the Stalwart mail ports is already in use on the host, there is a helpful script you can run on the server before retrying:
+
+```bash
+sudo ./scripts/stalwart/free-ports.sh
+```
+
+That script stops common Linux mail services, stops Docker containers already publishing the Stalwart mail ports, and kills any remaining listeners on ports `25`, `110`, `143`, `465`, `587`, `993`, `995`, and `4190`.
 
 ## First Login
 
