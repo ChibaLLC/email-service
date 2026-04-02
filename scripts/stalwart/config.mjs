@@ -26,6 +26,8 @@ export function buildStalwartConfig(env) {
   const acmeCache = env.STALWART_ACME_CACHE || "%{BASE_PATH}%/etc/acme";
   const acmeRenewBefore = env.STALWART_ACME_RENEW_BEFORE || "30d";
   const acmeDefault = env.STALWART_ACME_DEFAULT !== "false";
+  const proxyTrustedNetworks = parseList(env.STALWART_PROXY_TRUSTED_NETWORKS);
+  const httpUseXForwarded = env.STALWART_HTTP_USE_X_FORWARDED === "true";
   const resolvedAcmeDomains = acmeDomains.length > 0 ? acmeDomains : [hostname];
   const acmeConfig = acmeEnabled
     ? `
@@ -44,6 +46,30 @@ renew-before = ${JSON.stringify(acmeRenewBefore)}
 default = ${acmeDefault}
 `
     : "";
+  const httpConfig = httpUseXForwarded
+    ? `
+
+[http]
+use-x-forwarded = true
+`
+    : "";
+  const proxyConfig =
+    proxyTrustedNetworks.length > 0
+      ? `
+
+[server.listener."smtp".proxy]
+trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
+
+[server.listener."submissions".proxy]
+trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
+
+[server.listener."imaptls".proxy]
+trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
+
+[server.listener."https".proxy]
+trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
+`
+      : "";
 
   return `[server]
 hostname = "${hostname}"
@@ -91,6 +117,7 @@ protocol = "http"
 bind = ["[::]:443"]
 protocol = "http"
 tls.implicit = true
+${httpConfig}${proxyConfig}
 
 [storage]
 data = "postgresql"

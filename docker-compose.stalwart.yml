@@ -80,6 +80,8 @@ services:
       - STALWART_ACME_CACHE=${STALWART_ACME_CACHE:-%{BASE_PATH}%/etc/acme}
       - STALWART_ACME_RENEW_BEFORE=${STALWART_ACME_RENEW_BEFORE:-30d}
       - STALWART_ACME_DEFAULT=${STALWART_ACME_DEFAULT:-true}
+      - STALWART_PROXY_TRUSTED_NETWORKS=${STALWART_PROXY_TRUSTED_NETWORKS:-}
+      - STALWART_HTTP_USE_X_FORWARDED=${STALWART_HTTP_USE_X_FORWARDED:-false}
       - STALWART_DB_USER=${STALWART_DB_USER:-stalwart}
       - STALWART_DB_PASSWORD=${STALWART_DB_PASSWORD:-stalwart}
       - STALWART_DB_NAME=${STALWART_DB_NAME:-stalwart}
@@ -106,6 +108,36 @@ services:
         condition: service_completed_successfully
       stalwart-config:
         condition: service_completed_successfully
+    labels:
+      - traefik.enable=${STALWART_TRAEFIK_ENABLED:-false}
+      - traefik.docker.network=${STALWART_TRAEFIK_DOCKER_NETWORK:-${COMPOSE_PROJECT_NAME:-email-service}_default}
+      - "traefik.http.routers.mailserver.rule=Host(`${STALWART_HOSTNAME:-mail.example.com}`) || Host(`${STALWART_AUTODISCOVER_HOSTNAME:-autodiscover.example.com}`) || Host(`${STALWART_AUTOCONFIG_HOSTNAME:-autoconfig.example.com}`) || Host(`${STALWART_MTA_STS_HOSTNAME:-mta-sts.example.com}`)"
+      - traefik.http.routers.mailserver.entrypoints=${STALWART_TRAEFIK_HTTPS_ENTRYPOINT:-https}
+      - traefik.http.routers.mailserver.service=mailserver
+      - traefik.http.services.mailserver.loadbalancer.server.port=8080
+      - "traefik.tcp.routers.smtp.rule=HostSNI(`*`)"
+      - traefik.tcp.routers.smtp.entrypoints=${STALWART_TRAEFIK_SMTP_ENTRYPOINT:-smtp}
+      - traefik.tcp.routers.smtp.service=smtp
+      - traefik.tcp.services.smtp.loadbalancer.server.port=25
+      - traefik.tcp.services.smtp.loadbalancer.proxyProtocol.version=2
+      - "traefik.tcp.routers.jmap.rule=HostSNI(`*`)"
+      - traefik.tcp.routers.jmap.tls.passthrough=true
+      - traefik.tcp.routers.jmap.entrypoints=${STALWART_TRAEFIK_HTTPS_ENTRYPOINT:-https}
+      - traefik.tcp.routers.jmap.service=jmap
+      - traefik.tcp.services.jmap.loadbalancer.server.port=443
+      - traefik.tcp.services.jmap.loadbalancer.proxyProtocol.version=2
+      - "traefik.tcp.routers.smtps.rule=HostSNI(`*`)"
+      - traefik.tcp.routers.smtps.tls.passthrough=true
+      - traefik.tcp.routers.smtps.entrypoints=${STALWART_TRAEFIK_SMTPS_ENTRYPOINT:-smtps}
+      - traefik.tcp.routers.smtps.service=smtps
+      - traefik.tcp.services.smtps.loadbalancer.server.port=465
+      - traefik.tcp.services.smtps.loadbalancer.proxyProtocol.version=2
+      - "traefik.tcp.routers.imaps.rule=HostSNI(`*`)"
+      - traefik.tcp.routers.imaps.tls.passthrough=true
+      - traefik.tcp.routers.imaps.entrypoints=${STALWART_TRAEFIK_IMAPS_ENTRYPOINT:-imaps}
+      - traefik.tcp.routers.imaps.service=imaps
+      - traefik.tcp.services.imaps.loadbalancer.server.port=993
+      - traefik.tcp.services.imaps.loadbalancer.proxyProtocol.version=2
     ports:
       - "25:25"
       - "587:587"

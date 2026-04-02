@@ -101,6 +101,9 @@ Stalwart generates its own recommended DNS records per configured domain, includ
 Important production env keys in [.env.example](../../.env.example):
 
 - `STALWART_HOSTNAME`
+- `STALWART_AUTODISCOVER_HOSTNAME`
+- `STALWART_AUTOCONFIG_HOSTNAME`
+- `STALWART_MTA_STS_HOSTNAME`
 - `STALWART_ADMIN_USER`
 - `STALWART_ADMIN_PASSWORD`
 - `STALWART_ACME_ENABLED`
@@ -111,6 +114,14 @@ Important production env keys in [.env.example](../../.env.example):
 - `STALWART_ACME_CACHE`
 - `STALWART_ACME_RENEW_BEFORE`
 - `STALWART_ACME_DEFAULT`
+- `STALWART_PROXY_TRUSTED_NETWORKS`
+- `STALWART_HTTP_USE_X_FORWARDED`
+- `STALWART_TRAEFIK_ENABLED`
+- `STALWART_TRAEFIK_DOCKER_NETWORK`
+- `STALWART_TRAEFIK_HTTPS_ENTRYPOINT`
+- `STALWART_TRAEFIK_SMTP_ENTRYPOINT`
+- `STALWART_TRAEFIK_SMTPS_ENTRYPOINT`
+- `STALWART_TRAEFIK_IMAPS_ENTRYPOINT`
 - `STALWART_DB_USER`
 - `STALWART_DB_PASSWORD`
 - `STALWART_DB_NAME`
@@ -149,6 +160,157 @@ For a reverse-proxy-managed deployment, use one of these models:
 This repo currently generates the common ACME settings shown in the Stalwart Let's Encrypt example: directory, challenge, contact, domains, cache, renew-before, and default. If you want `dns-01`, you will also need to extend the generator with your provider-specific Stalwart settings such as `provider`, `secret`, `origin`, or RFC2136 parameters.
 
 Enabling ACME here is the right fix for the SMTP certificate problem you observed, because the current Stalwart config enables TLS listeners but does not define any certificate source. Without ACME or an explicit certificate configuration, Stalwart falls back to a self-signed certificate.
+
+## Reverse Proxy Examples
+
+The generated `config.toml` comes from [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) through [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs). That script is what defines the internal Stalwart listeners your reverse proxy targets: SMTP on `25`, submission on `587`, SMTPS on `465`, IMAPS on `993`, HTTP on `8080`, and HTTPS or JMAP on `443`.
+
+That same generator now also supports reverse-proxy-aware settings:
+
+- `STALWART_PROXY_TRUSTED_NETWORKS` writes per-listener Proxy Protocol trust settings for SMTP, SMTPS, IMAPS, and HTTPS.
+- `STALWART_HTTP_USE_X_FORWARDED=true` makes the generated config trust forwarded HTTP headers for the web UI.
+
+The compose overlay now includes optional Traefik labels on the `stalwart` service. They stay inactive unless you set `STALWART_TRAEFIK_ENABLED=true`.
+
+By default, the Traefik network label is derived from `COMPOSE_PROJECT_NAME` as `${COMPOSE_PROJECT_NAME}_default`. If Traefik runs on a different project-prefixed or external Docker network, set `STALWART_TRAEFIK_DOCKER_NETWORK` to the exact shared network name. This value is written directly to the `traefik.docker.network` label so Traefik selects the correct network for the container.
+
+Example `.env` values for Traefik:
+
+```bash
+STALWART_TRAEFIK_ENABLED=true
+COMPOSE_PROJECT_NAME=mailstack
+STALWART_HOSTNAME=mail.example.com
+STALWART_AUTODISCOVER_HOSTNAME=autodiscover.example.com
+STALWART_AUTOCONFIG_HOSTNAME=autoconfig.example.com
+STALWART_MTA_STS_HOSTNAME=mta-sts.example.com
+STALWART_TRAEFIK_HTTPS_ENTRYPOINT=https
+STALWART_TRAEFIK_SMTP_ENTRYPOINT=smtp
+STALWART_TRAEFIK_SMTPS_ENTRYPOINT=smtps
+STALWART_TRAEFIK_IMAPS_ENTRYPOINT=imaps
+STALWART_PROXY_TRUSTED_NETWORKS=172.19.0.0/16
+STALWART_HTTP_USE_X_FORWARDED=true
+```
+
+Traefik:
+
+```yaml
+services:
+  stalwart:
+	labels:
+	  - traefik.enable=true
+	  - traefik.docker.network=mailstack_default
+	  - traefik.http.routers.mailserver.rule=Host(`mail.example.com`) || Host(`autodiscover.example.com`) || Host(`autoconfig.example.com`) || Host(`mta-sts.example.com`)
+	  - traefik.http.routers.mailserver.entrypoints=https
+	  - traefik.http.routers.mailserver.service=mailserver
+	  - traefik.http.services.mailserver.loadbalancer.server.port=8080
+	  - traefik.tcp.routers.smtp.rule=HostSNI(`*`)
+	  - traefik.tcp.routers.smtp.entrypoints=smtp
+	  - traefik.tcp.routers.smtp.service=smtp
+	  - traefik.tcp.services.smtp.loadbalancer.server.port=25
+	  - traefik.tcp.services.smtp.loadbalancer.proxyProtocol.version=2
+	  - traefik.tcp.routers.jmap.rule=HostSNI(`*`)
+	  - traefik.tcp.routers.jmap.tls.passthrough=true
+	  - traefik.tcp.routers.jmap.entrypoints=https
+	  - traefik.tcp.routers.jmap.service=jmap
+	  - traefik.tcp.services.jmap.loadbalancer.server.port=443
+	  - traefik.tcp.services.jmap.loadbalancer.proxyProtocol.version=2
+	  - traefik.tcp.routers.smtps.rule=HostSNI(`*`)
+	  - traefik.tcp.routers.smtps.tls.passthrough=true
+	  - traefik.tcp.routers.smtps.entrypoints=smtps
+	  - traefik.tcp.routers.smtps.service=smtps
+	  - traefik.tcp.services.smtps.loadbalancer.server.port=465
+	  - traefik.tcp.services.smtps.loadbalancer.proxyProtocol.version=2
+	  - traefik.tcp.routers.imaps.rule=HostSNI(`*`)
+	  - traefik.tcp.routers.imaps.tls.passthrough=true
+	  - traefik.tcp.routers.imaps.entrypoints=imaps
+	  - traefik.tcp.routers.imaps.service=imaps
+	  - traefik.tcp.services.imaps.loadbalancer.server.port=993
+	  - traefik.tcp.services.imaps.loadbalancer.proxyProtocol.version=2
+```
+
+Caddy:
+
+```caddy
+mail.example.com {
+	reverse_proxy http://stalwart:8080
+}
+
+{
+	layer4 {
+		0.0.0.0:25 {
+			route {
+				proxy {
+					proxy_protocol v2
+					upstream stalwart:25
+				}
+			}
+		}
+		0.0.0.0:465 {
+			route {
+				proxy {
+					proxy_protocol v2
+					upstream stalwart:465
+				}
+			}
+		}
+		0.0.0.0:993 {
+			route {
+				proxy {
+					proxy_protocol v2
+					upstream stalwart:993
+				}
+			}
+		}
+	}
+}
+```
+
+NGINX:
+
+```nginx
+stream {
+	server {
+		listen 25 proxy_protocol;
+		proxy_pass stalwart:25;
+		proxy_protocol on;
+	}
+
+	server {
+		listen 465 proxy_protocol;
+		proxy_pass stalwart:465;
+		proxy_protocol on;
+	}
+
+	server {
+		listen 993 proxy_protocol;
+		proxy_pass stalwart:993;
+		proxy_protocol on;
+	}
+}
+
+http {
+	server {
+		listen 443 ssl;
+		server_name mail.example.com autodiscover.example.com autoconfig.example.com mta-sts.example.com;
+
+		location / {
+			proxy_pass http://stalwart:8080;
+			proxy_set_header Host $host;
+			proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+			proxy_set_header X-Forwarded-Proto $scheme;
+		}
+	}
+}
+```
+
+Operational notes:
+
+1. If Traefik, Caddy, or NGINX owns host ports `25`, `443`, `465`, or `993`, do not also publish those same host ports directly from the `stalwart` container in that deployment. Use a compose override or deployment-specific compose file to avoid port conflicts.
+2. For project-based Compose deployments with Traefik, the default network label becomes `${COMPOSE_PROJECT_NAME}_default`. If Traefik uses a different shared network, override it with `STALWART_TRAEFIK_DOCKER_NETWORK`.
+3. For Traefik, Caddy, or NGINX TCP forwarding with Proxy Protocol enabled, set `STALWART_PROXY_TRUSTED_NETWORKS` to the proxy container IPs or CIDRs. Without that, Stalwart will not have the right client connection metadata.
+4. For HTTP reverse proxying of the web UI, set `STALWART_HTTP_USE_X_FORWARDED=true` so the generated config in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) trusts forwarded scheme and address headers.
+5. For Traefik TCP passthrough on `443`, `465`, and `993`, Stalwart still needs a valid certificate source. That means ACME in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) or explicit certificate settings added to that generator.
+6. Caddy needs layer 4 support for raw mail protocols. Without `caddy-l4` or another L4-capable proxy in front, it can only cover the web UI.
 
 ## Configure The App To Use Stalwart
 
