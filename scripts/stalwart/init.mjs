@@ -2,7 +2,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { buildStalwartConfig } from "./config.mjs";
-import { inspectNetworkViaSocket, resolveNetworkName } from "./proxy-network.mjs";
+import { inspectContainerNetworksViaSocket, inspectNetworkViaSocket, resolveNetworkName } from "./proxy-network.mjs";
 
 const configPath = process.env.STALWART_CONFIG_PATH || "/opt/stalwart/etc/config.toml";
 const configDir = configPath.slice(0, configPath.lastIndexOf("/"));
@@ -16,10 +16,19 @@ async function maybeAutodetectProxyTrustedNetworks() {
     return;
   }
 
-  const networkName = resolveNetworkName({ network: process.env.STALWART_TRAEFIK_DOCKER_NETWORK });
-  const trustedNetworks = await inspectNetworkViaSocket(networkName);
+  if (process.env.STALWART_TRAEFIK_DOCKER_NETWORK) {
+    const networkName = resolveNetworkName({ network: process.env.STALWART_TRAEFIK_DOCKER_NETWORK });
+    const trustedNetworks = await inspectNetworkViaSocket(networkName);
+    process.env.STALWART_PROXY_TRUSTED_NETWORKS = trustedNetworks;
+    console.log(`Auto-detected STALWART_PROXY_TRUSTED_NETWORKS=${trustedNetworks} from Docker network ${networkName}`);
+    return;
+  }
+
+  const { networkNames, trustedNetworks } = await inspectContainerNetworksViaSocket();
   process.env.STALWART_PROXY_TRUSTED_NETWORKS = trustedNetworks;
-  console.log(`Auto-detected STALWART_PROXY_TRUSTED_NETWORKS=${trustedNetworks} from Docker network ${networkName}`);
+  console.log(
+    `Auto-detected STALWART_PROXY_TRUSTED_NETWORKS=${trustedNetworks} from attached Docker networks ${networkNames.join(", ")}`,
+  );
 }
 
 await maybeAutodetectProxyTrustedNetworks();

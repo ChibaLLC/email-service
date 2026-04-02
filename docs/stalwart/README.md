@@ -176,6 +176,8 @@ To avoid looking up the proxy subnet manually, this repo also includes [scripts/
 
 If you prefer to resolve this automatically during Stalwart config generation, set `STALWART_PROXY_AUTODETECT=true`. The one-shot `stalwart-config` container will inspect the Docker API through `/var/run/docker.sock` and populate `STALWART_PROXY_TRUSTED_NETWORKS` before [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) writes `config.toml`.
 
+When `STALWART_TRAEFIK_DOCKER_NETWORK` is set, autodetect uses that exact network. When it is not set, autodetect falls back to the Docker networks attached to the `stalwart-config` container itself, which is more reliable in deployment platforms that rename Compose projects or networks.
+
 The compose overlay now includes optional Traefik labels on the `stalwart` service. They stay inactive unless you set `STALWART_TRAEFIK_ENABLED=true`.
 
 By default, the Traefik network label is derived from `COMPOSE_PROJECT_NAME` as `${COMPOSE_PROJECT_NAME}_default`. If Traefik runs on a different project-prefixed or external Docker network, set `STALWART_TRAEFIK_DOCKER_NETWORK` to the exact shared network name. This value is written directly to the `traefik.docker.network` label so Traefik selects the correct network for the container.

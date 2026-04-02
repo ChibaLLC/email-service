@@ -73,22 +73,12 @@ function extractSubnets(details, networkName) {
   return subnets.join(",");
 }
 
-async function inspectNetwork(networkName) {
-  const { stdout } = await execFileAsync("docker", ["network", "inspect", networkName], {
-    windowsHide: true,
-  });
-  const details = JSON.parse(stdout);
-
-  return extractSubnets(details, networkName);
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
 }
 
-export async function inspectNetworkViaSocket(
-  networkName,
-  socketPath = process.env.STALWART_DOCKER_SOCKET_PATH || "/var/run/docker.sock",
-) {
-  const path = `/networks/${encodeURIComponent(networkName)}`;
-
-  const body = await new Promise((resolve, reject) => {
+async function dockerSocketRequest(path, socketPath) {
+  return new Promise((resolve, reject) => {
     const request = http.request(
       {
         socketPath,
@@ -103,7 +93,7 @@ export async function inspectNetworkViaSocket(
         });
         response.on("end", () => {
           if (response.statusCode && response.statusCode >= 400) {
-            reject(new Error(`Docker API returned ${response.statusCode} for network \"${networkName}\".`));
+            reject(new Error(`Docker API returned ${response.statusCode} for ${path}.`));
             return;
           }
           resolve(data);
@@ -114,8 +104,56 @@ export async function inspectNetworkViaSocket(
     request.on("error", reject);
     request.end();
   });
+}
+
+async function inspectNetwork(networkName) {
+  const { stdout } = await execFileAsync("docker", ["network", "inspect", networkName], {
+    windowsHide: true,
+  });
+  const details = JSON.parse(stdout);
+
+  return extractSubnets(details, networkName);
+}
+
+export async function inspectNetworkViaSocket(
+  networkName,
+  socketPath = process.env.STALWART_DOCKER_SOCKET_PATH || "/var/run/docker.sock",
+) {
+  const path = `/networks/${encodeURIComponent(networkName)}`;
+  const body = await dockerSocketRequest(path, socketPath);
 
   return extractSubnets(JSON.parse(body), networkName);
+}
+
+export async function inspectContainerNetworksViaSocket(
+  containerId = process.env.HOSTNAME,
+  socketPath = process.env.STALWART_DOCKER_SOCKET_PATH || "/var/run/docker.sock",
+) {
+  if (!containerId) {
+    throw new Error("Current container id is unavailable. Set HOSTNAME or provide an explicit Traefik Docker network.");
+  }
+
+  const path = `/containers/${encodeURIComponent(containerId)}/json`;
+  const body = await dockerSocketRequest(path, socketPath);
+  const details = JSON.parse(body);
+  const networks = Object.keys(details?.NetworkSettings?.Networks || {});
+
+  if (networks.length === 0) {
+    throw new Error(`No attached Docker networks found for container \"${containerId}\".`);
+  }
+
+  const subnetGroups = await Promise.all(
+    networks.map((networkName) => inspectNetworkViaSocket(networkName, socketPath)),
+  );
+  const trustedNetworks = unique(subnetGroups.flatMap((group) => group.split(",").map((item) => item.trim()))).join(
+    ",",
+  );
+
+  return {
+    containerId,
+    networkNames: networks,
+    trustedNetworks,
+  };
 }
 
 async function updateEnvFile(envFile, assignment) {
