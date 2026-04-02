@@ -4,36 +4,43 @@ Production-ready email service with queue processing, provider-agnostic architec
 
 ## Quick Start
 
-### 1. Docker Compose (PostgreSQL + Redis)
+### 1. Docker Compose
 
 ```bash
-pnpm dev:start
+pnpm listmonk:prepare
+pnpm postal:prepare
+docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
 ```
 
-Optional Postal overlay:
+This starts the app, PostgreSQL, Redis, Listmonk, and Postal on the internal Docker network.
+Use Traefik or another reverse proxy to publish the services you want externally.
+
+If you only want the app stack plus Listmonk:
 
 ```bash
-pnpm dev:start:postal
+docker compose -f docker-compose.yml --env-file .env up -d
 ```
 
 ### 2. Local Development
 
 ```bash
 cp .env.example .env
-# Edit .env with your provider credentials
+# Edit .env with your provider credentials and real hostnames.
 
 pnpm install
-pnpm db:push        # Push schema to PostgreSQL
-pnpm dev            # Start dev server
+pnpm db:push
+pnpm dev
 ```
+
+Important: the current compose files use `expose` instead of `ports`. That works for a fully containerized setup behind Traefik, but it means the native `pnpm dev:start*` flow no longer exposes Postgres or Redis to your host. If you want Nuxt to run on your host, you must either publish those ports again or point the app at other reachable database and Redis hosts.
 
 ### 3. Access
 
 | URL                                     | Description          |
 | --------------------------------------- | -------------------- |
-| `http://localhost:3000`                 | API key registration |
-| `http://localhost:3000/dashboard/login` | Dashboard login      |
-| `http://localhost:3000/dashboard`       | Monitoring dashboard |
+| `https://your-app-host`                 | API key registration |
+| `https://your-app-host/dashboard/login` | Dashboard login      |
+| `https://your-app-host/dashboard`       | Monitoring dashboard |
 
 ## Architecture
 
@@ -178,16 +185,19 @@ Minimum app configuration:
 
 ```bash
 EMAIL_PROVIDER=postal
-POSTAL_API_URL=http://localhost:5000
+POSTAL_API_URL=http://postal-web:5000
 POSTAL_SERVER_API_KEY=postal_server_api_key
 DEFAULT_FROM=verified-sender@example.com
 ```
 
-For local development with the built-in overlay:
+For the fully containerized stack:
 
 ```bash
-pnpm dev:start:postal
+pnpm postal:prepare
+docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
 ```
+
+If you are running the app outside Docker, replace `POSTAL_API_URL` with your Traefik hostname or another externally reachable Postal URL.
 
 Use the dedicated guide for the full Postal bootstrapping flow, DNS records, Postal UI setup, and delivery requirements.
 
@@ -197,7 +207,7 @@ See [docs/postal/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/p
 
 Listmonk is integrated here as a proxied mailing-list service, not as an email provider.
 
-The containerized stack in [docker-compose.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.yml) includes Listmonk by default. The native-dev workflow still uses the Listmonk overlay so you can run Nuxt outside Docker with `pnpm dev:start:listmonk`.
+The containerized stack in [docker-compose.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.yml) includes Listmonk by default. In Docker Compose, point the app at `http://listmonk-app:9000`; if you are calling Listmonk from outside Docker, use your Traefik hostname instead.
 
 Use the dedicated guide for the Listmonk overlay, proxy configuration, and dashboard API usage.
 
@@ -216,10 +226,10 @@ Authenticated dashboard users can queue a test email to their own login address 
 | Script             | Description              |
 | ------------------ | ------------------------ |
 | `pnpm dev`         | Start development server |
-| `pnpm dev:start:all` | Start the app with both Postal and Listmonk overlays |
-| `pnpm dev:start`   | Start Postgres + Redis + Nuxt via the local orchestrator |
-| `pnpm dev:start:listmonk` | Start the base dev stack plus the Listmonk overlay |
-| `pnpm dev:start:postal` | Start the base dev stack plus the Postal overlay |
+| `pnpm dev:start:all` | Start Nuxt on the host plus the Postal and Listmonk overlays; requires host-reachable database and Redis services |
+| `pnpm dev:start`   | Start Postgres + Redis + Nuxt via the local orchestrator; requires published ports or other host-reachable services |
+| `pnpm dev:start:listmonk` | Start the base dev stack plus the Listmonk overlay; requires host-reachable database and Redis services |
+| `pnpm dev:start:postal` | Start the base dev stack plus the Postal overlay; requires host-reachable database and Redis services |
 | `pnpm listmonk:prepare` | Generate local Listmonk config files |
 | `pnpm listmonk:prepare:force` | Regenerate Listmonk config files |
 | `pnpm listmonk:preview` | Preview the generated Listmonk config without writing it |

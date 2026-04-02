@@ -25,7 +25,7 @@ For the full containerized stack, use Docker Compose directly after generating t
 
 ```bash
 pnpm listmonk:prepare
-docker compose up -d
+docker compose -f docker-compose.yml --env-file .env up -d
 ```
 
 For native Nuxt development with only the infrastructure and Listmonk in containers:
@@ -69,6 +69,8 @@ LISTMONK_PASSWORD=api_token
 Notes:
 
 - `LISTMONK_API_URL` is the Listmonk web base URL, not the full `/api` endpoint
+- In Docker Compose, use the internal service URL such as `http://listmonk-app:9000`
+- If the app is outside Docker, use your Traefik hostname or another reachable Listmonk URL instead
 - `LISTMONK_USERNAME` and `LISTMONK_PASSWORD` are the API user's BasicAuth credentials
 
 The app does not use Listmonk as an `EMAIL_PROVIDER`. Instead, it exposes a server-side proxy for authenticated dashboard traffic:
@@ -81,7 +83,7 @@ This keeps Listmonk credentials on the server side instead of exposing them to t
 
 ## Listmonk UI Setup
 
-After the Listmonk overlay is running, open Listmonk at `http://localhost:9000` unless you changed `LISTMONK_APP_PORT`.
+After Listmonk is running, open it at the hostname your reverse proxy exposes for it. In a pure internal Docker setup, the app should still talk to Listmonk at `http://listmonk-app:9000`.
 
 The minimum Listmonk-side setup is:
 
@@ -144,8 +146,8 @@ Those generated files are intentionally ignored by Git via [.gitignore](/home/al
 
 ## Verifying The App Integration
 
-1. Start the app with `pnpm dev:start:listmonk` or `pnpm dev:start:all`.
-2. Confirm Listmonk opens at `http://localhost:9000`.
+1. Start the app with `docker compose -f docker-compose.yml --env-file .env up -d`, `pnpm dev:start:listmonk`, or `pnpm dev:start:all`.
+2. Confirm Listmonk opens at your configured public hostname.
 3. Make an authenticated request to `/api/dashboard/listmonk/lists` or another Listmonk API endpoint.
 4. Confirm the response matches the Listmonk API and the credentials are not sent from the browser.
 

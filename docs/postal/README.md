@@ -35,7 +35,16 @@ For real outbound delivery beyond local testing, you also need:
 
 ## Quick Start
 
-### 1. Start the base stack with Postal
+### 1. Start the stack with Postal
+
+For a containerized deployment behind Traefik:
+
+```bash
+pnpm postal:prepare
+docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
+```
+
+For native Nuxt development with Postal running in containers:
 
 ```bash
 pnpm dev:start:postal
@@ -43,7 +52,7 @@ pnpm dev:start:postal
 
 That command uses the generic dev orchestrator in [scripts/dev.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/dev.mjs) with the Postal overlay enabled.
 
-On first run it will prepare local Postal config under `docker/postal/config/`, then start:
+On first run the helper will prepare local Postal config under `docker/postal/config/`, then start:
 
 - PostgreSQL for this app
 - Redis for this app
@@ -51,6 +60,8 @@ On first run it will prepare local Postal config under `docker/postal/config/`, 
 - Postal web
 - Postal worker
 - Postal SMTP
+
+Important: because the compose files now use `expose` instead of `ports`, the native `pnpm dev:start:postal` path only works if your host can still reach the app database and Redis. For Traefik-based deployments, prefer the full Docker Compose command above.
 
 If you want to prepare or manage Postal separately from the Nuxt dev process, these scripts are available:
 
@@ -73,7 +84,7 @@ Update `.env`:
 
 ```bash
 EMAIL_PROVIDER=postal
-POSTAL_API_URL=http://localhost:5000
+POSTAL_API_URL=http://postal-web:5000
 POSTAL_SERVER_API_KEY=postal_server_api_key
 DEFAULT_FROM=verified-sender@example.com
 ```
@@ -81,6 +92,8 @@ DEFAULT_FROM=verified-sender@example.com
 Notes:
 
 - `POSTAL_API_URL` is the Postal web base URL, not the full send endpoint
+- In Docker Compose, use the internal service URL such as `http://postal-web:5000`
+- If the app is outside Docker, use your Traefik hostname or another reachable Postal URL instead
 - `POSTAL_SERVER_API_KEY` is a Postal server API credential created inside Postal
 - `DEFAULT_FROM` must be an address your Postal server is allowed to send from
 
@@ -108,7 +121,7 @@ The Postal DNS values are intentionally validated in the Postal CLI rather than 
 
 ## Postal UI Setup
 
-After the Postal overlay is running, open Postal at the local web URL you configured. With the default local overlay that is usually `http://localhost:5000`.
+After Postal is running, open Postal at the hostname your reverse proxy exposes for it. In a pure internal Docker setup, the app should still talk to Postal at `http://postal-web:5000`.
 
 The minimum Postal-side setup is:
 
