@@ -42,7 +42,7 @@ describe("JWT (jose)", () => {
   });
 
   it("should include the email in the payload", async () => {
-    const email = "admin@finueva.com";
+    const email = "admin@example.com";
     const token = await signJWT({ email }, TEST_SECRET);
     const payload = await verifyJWT(token, TEST_SECRET);
 

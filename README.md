@@ -245,6 +245,8 @@ docker compose -f ./docker-compose.prod.yml --env-file .env up
 
 That compose file includes the base app services plus Postal, Listmonk, and Stalwart. If you keep both Postal and Stalwart enabled, point the app at the service you actually want to send through by setting `EMAIL_PROVIDER` and the matching SMTP or API credentials in `.env`.
 
+If Stalwart is the intended inbound mail server for a domain, remove Postal MX records for that domain and keep only the Stalwart MX target.
+
 Use the dedicated guide for first login, storage topology, coexistence with Postal, domain setup, DNS, and SMTP configuration details.
 
 See [docs/stalwart/README.md](docs/stalwart/README.md).

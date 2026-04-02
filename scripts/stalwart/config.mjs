@@ -1,3 +1,10 @@
+function parseList(value) {
+  return (value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function buildStalwartConfig(env) {
   const dbName = env.STALWART_DB_NAME || "stalwart";
   const dbUser = env.STALWART_DB_USER || "stalwart";
@@ -11,6 +18,32 @@ export function buildStalwartConfig(env) {
   const hostname = env.STALWART_HOSTNAME || "mail.example.com";
   const adminUser = env.STALWART_ADMIN_USER || "admin";
   const adminPassword = env.STALWART_ADMIN_PASSWORD || "change-me-stalwart-admin";
+  const acmeEnabled = env.STALWART_ACME_ENABLED === "true";
+  const acmeDirectory = env.STALWART_ACME_DIRECTORY || "https://acme-v02.api.letsencrypt.org/directory";
+  const acmeChallenge = env.STALWART_ACME_CHALLENGE || "tls-alpn-01";
+  const acmeContacts = parseList(env.STALWART_ACME_CONTACT);
+  const acmeDomains = parseList(env.STALWART_ACME_DOMAINS);
+  const acmeCache = env.STALWART_ACME_CACHE || "%{BASE_PATH}%/etc/acme";
+  const acmeRenewBefore = env.STALWART_ACME_RENEW_BEFORE || "30d";
+  const acmeDefault = env.STALWART_ACME_DEFAULT !== "false";
+  const resolvedAcmeDomains = acmeDomains.length > 0 ? acmeDomains : [hostname];
+  const acmeConfig = acmeEnabled
+    ? `
+
+[acme."letsencrypt"]
+directory = ${JSON.stringify(acmeDirectory)}
+challenge = ${JSON.stringify(acmeChallenge)}
+${
+  acmeContacts.length > 0
+    ? `contact = ${JSON.stringify(acmeContacts)}
+`
+    : ""
+}domains = ${JSON.stringify(resolvedAcmeDomains)}
+cache = ${JSON.stringify(acmeCache)}
+renew-before = ${JSON.stringify(acmeRenewBefore)}
+default = ${acmeDefault}
+`
+    : "";
 
   return `[server]
 hostname = "${hostname}"
@@ -101,5 +134,5 @@ store = "postgresql"
 [authentication.fallback-admin]
 user = "${adminUser}"
 secret = "${adminPassword}"
-`;
+${acmeConfig}`;
 }

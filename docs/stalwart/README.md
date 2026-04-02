@@ -72,6 +72,8 @@ Typical split:
 
 The app only sends through one configured provider at a time. If you want the app to send through Stalwart, use the nodemailer settings shown below. If you want the app to send through Postal instead, switch back to the Postal provider env configuration documented in [docs/postal/README.md](../postal/README.md).
 
+Important for inbound delivery: if Stalwart should receive mail for a domain, do not keep Postal MX records for that same domain. Remove the Postal MX targets and keep only the Stalwart MX target, for example keep `example.com MX 10 stalwart.example.com` and remove `mx1.postal.example.com` and `mx2.postal.example.com`. Otherwise remote senders may choose either system for delivery.
+
 ## Configure Stalwart In Production
 
 The production overlay writes a `config.toml` that preselects these backends from first boot:
@@ -101,6 +103,14 @@ Important production env keys in [.env.example](../../.env.example):
 - `STALWART_HOSTNAME`
 - `STALWART_ADMIN_USER`
 - `STALWART_ADMIN_PASSWORD`
+- `STALWART_ACME_ENABLED`
+- `STALWART_ACME_DIRECTORY`
+- `STALWART_ACME_CHALLENGE`
+- `STALWART_ACME_CONTACT`
+- `STALWART_ACME_DOMAINS`
+- `STALWART_ACME_CACHE`
+- `STALWART_ACME_RENEW_BEFORE`
+- `STALWART_ACME_DEFAULT`
 - `STALWART_DB_USER`
 - `STALWART_DB_PASSWORD`
 - `STALWART_DB_NAME`
@@ -109,6 +119,36 @@ Important production env keys in [.env.example](../../.env.example):
 - `STALWART_MINIO_ROOT_PASSWORD`
 - `STALWART_MINIO_BUCKET`
 - `STALWART_MINIO_REGION`
+
+## Automatic TLS With ACME
+
+The generated Stalwart config can now emit an optional Let's Encrypt ACME section.
+
+Set these values in `.env` to enable it:
+
+```bash
+STALWART_ACME_ENABLED=true
+STALWART_ACME_DIRECTORY=https://acme-v02.api.letsencrypt.org/directory
+STALWART_ACME_CHALLENGE=tls-alpn-01
+STALWART_ACME_CONTACT=postmaster@example.com
+STALWART_ACME_DOMAINS=stalwart.example.com
+STALWART_ACME_CACHE=%{BASE_PATH}%/etc/acme
+STALWART_ACME_RENEW_BEFORE=30d
+STALWART_ACME_DEFAULT=true
+```
+
+Important constraint: `tls-alpn-01` only works if Stalwart itself can answer the ACME challenge on port `443` for the names in `STALWART_ACME_DOMAINS`.
+
+In this repo, the `stalwart` service currently publishes the mail ports directly but does not publish `443`. If Traefik or Dokploy already terminates HTTPS for that hostname, Stalwart will not receive the `tls-alpn-01` challenge unless you explicitly route or pass through port `443` to Stalwart.
+
+For a reverse-proxy-managed deployment, use one of these models:
+
+1. Let Stalwart manage its own certificates and make `443` reach Stalwart for ACME validation.
+2. Keep web TLS in Traefik and switch Stalwart ACME to `dns-01` instead of `tls-alpn-01`.
+
+This repo currently generates the common ACME settings shown in the Stalwart Let's Encrypt example: directory, challenge, contact, domains, cache, renew-before, and default. If you want `dns-01`, you will also need to extend the generator with your provider-specific Stalwart settings such as `provider`, `secret`, `origin`, or RFC2136 parameters.
+
+Enabling ACME here is the right fix for the SMTP certificate problem you observed, because the current Stalwart config enables TLS listeners but does not define any certificate source. Without ACME or an explicit certificate configuration, Stalwart falls back to a self-signed certificate.
 
 ## Configure The App To Use Stalwart
 
