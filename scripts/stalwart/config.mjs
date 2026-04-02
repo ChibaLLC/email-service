@@ -13,6 +13,50 @@ export function buildStalwartConfig(env) {
   return `[server]
 hostname = "${hostname}"
 
+[server.listener."smtp"]
+bind = ["[::]:25"]
+protocol = "smtp"
+
+[server.listener."submission"]
+bind = ["[::]:587"]
+protocol = "smtp"
+
+[server.listener."submissions"]
+bind = ["[::]:465"]
+protocol = "smtp"
+tls.implicit = true
+
+[server.listener."imap"]
+bind = ["[::]:143"]
+protocol = "imap"
+
+[server.listener."imaptls"]
+bind = ["[::]:993"]
+protocol = "imap"
+tls.implicit = true
+
+[server.listener."pop3"]
+bind = ["[::]:110"]
+protocol = "pop3"
+
+[server.listener."pop3s"]
+bind = ["[::]:995"]
+protocol = "pop3"
+tls.implicit = true
+
+[server.listener."sieve"]
+bind = ["[::]:4190"]
+protocol = "managesieve"
+
+[server.listener."http"]
+bind = ["[::]:8080"]
+protocol = "http"
+
+[server.listener."https"]
+bind = ["[::]:443"]
+protocol = "http"
+tls.implicit = true
+
 [storage]
 data = "postgresql"
 blob = "minio"
