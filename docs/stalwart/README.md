@@ -115,6 +115,8 @@ Important production env keys in [.env.example](../../.env.example):
 - `STALWART_ACME_RENEW_BEFORE`
 - `STALWART_ACME_DEFAULT`
 - `STALWART_PROXY_TRUSTED_NETWORKS`
+- `STALWART_PROXY_AUTODETECT`
+- `STALWART_DOCKER_SOCKET_PATH`
 - `STALWART_HTTP_USE_X_FORWARDED`
 - `STALWART_TRAEFIK_ENABLED`
 - `STALWART_TRAEFIK_DOCKER_NETWORK`
@@ -170,6 +172,10 @@ That same generator now also supports reverse-proxy-aware settings:
 - `STALWART_PROXY_TRUSTED_NETWORKS` writes per-listener Proxy Protocol trust settings for SMTP, SMTPS, IMAPS, and HTTPS.
 - `STALWART_HTTP_USE_X_FORWARDED=true` makes the generated config trust forwarded HTTP headers for the web UI.
 
+To avoid looking up the proxy subnet manually, this repo also includes [scripts/stalwart/proxy-network.mjs](../../scripts/stalwart/proxy-network.mjs). It inspects the Docker network used by Traefik and prints the value for `STALWART_PROXY_TRUSTED_NETWORKS`.
+
+If you prefer to resolve this automatically during Stalwart config generation, set `STALWART_PROXY_AUTODETECT=true`. The one-shot `stalwart-config` container will inspect the Docker API through `/var/run/docker.sock` and populate `STALWART_PROXY_TRUSTED_NETWORKS` before [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) writes `config.toml`.
+
 The compose overlay now includes optional Traefik labels on the `stalwart` service. They stay inactive unless you set `STALWART_TRAEFIK_ENABLED=true`.
 
 By default, the Traefik network label is derived from `COMPOSE_PROJECT_NAME` as `${COMPOSE_PROJECT_NAME}_default`. If Traefik runs on a different project-prefixed or external Docker network, set `STALWART_TRAEFIK_DOCKER_NETWORK` to the exact shared network name. This value is written directly to the `traefik.docker.network` label so Traefik selects the correct network for the container.
@@ -187,9 +193,33 @@ STALWART_TRAEFIK_HTTPS_ENTRYPOINT=https
 STALWART_TRAEFIK_SMTP_ENTRYPOINT=smtp
 STALWART_TRAEFIK_SMTPS_ENTRYPOINT=smtps
 STALWART_TRAEFIK_IMAPS_ENTRYPOINT=imaps
-STALWART_PROXY_TRUSTED_NETWORKS=172.19.0.0/16
+STALWART_PROXY_AUTODETECT=true
 STALWART_HTTP_USE_X_FORWARDED=true
 ```
+
+You can generate that value automatically:
+
+```bash
+pnpm stalwart:proxy-network
+```
+
+By default the helper inspects `${STALWART_TRAEFIK_DOCKER_NETWORK}` when it is set, otherwise `${COMPOSE_PROJECT_NAME}_default`.
+
+Useful variants:
+
+```bash
+pnpm stalwart:proxy-network --format value
+pnpm stalwart:proxy-network --network traefik_proxy
+pnpm stalwart:proxy-network --env-file .env
+```
+
+The `--env-file .env` form updates `STALWART_PROXY_TRUSTED_NETWORKS` in your env file directly.
+
+Auto-detect tradeoff:
+
+1. `STALWART_PROXY_AUTODETECT=true` is convenient, but it requires mounting the Docker socket into the `stalwart-config` container.
+2. That socket effectively gives the container privileged access to Docker on the host, so use this only when you accept that security tradeoff.
+3. If you want the safer path, leave autodetect off and keep using `pnpm stalwart:proxy-network --env-file .env` before startup.
 
 Traefik:
 

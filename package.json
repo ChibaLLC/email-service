@@ -37,6 +37,7 @@
     "postal:up": "node scripts/postal.mjs up",
     "postal:down": "node scripts/postal.mjs down",
     "postal:reset": "node scripts/postal.mjs reset",
+    "stalwart:proxy-network": "node scripts/stalwart/proxy-network.mjs",
     "test": "vitest",
     "test:run": "vitest run"
   },
