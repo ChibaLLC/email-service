@@ -29,6 +29,11 @@
       file: docker-compose.yml
       service: app
 
+  postal-config:
+    extends:
+      file: docker-compose.postal.yml
+      service: postal-config
+
   postal-init:
     extends:
       file: docker-compose.postal.yml
