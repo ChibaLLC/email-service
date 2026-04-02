@@ -7,9 +7,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${STALWART_DB_USER:-stalwart}
-      POSTGRES_PASSWORD: ${STALWART_DB_PASSWORD:-stalwart}
-      POSTGRES_DB: ${STALWART_DB_NAME:-stalwart}
+      - POSTGRES_USER=${STALWART_DB_USER:-stalwart}
+      - POSTGRES_PASSWORD=${STALWART_DB_PASSWORD:-stalwart}
+      - POSTGRES_DB=${STALWART_DB_NAME:-stalwart}
     expose:
       - "5432"
     volumes:
@@ -39,8 +39,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${STALWART_MINIO_ROOT_USER:-stalwart}
-      MINIO_ROOT_PASSWORD: ${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
+      - MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
+      - MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
     expose:
       - "9000"
       - "9001"
@@ -60,25 +60,27 @@ services:
       stalwart-minio:
         condition: service_started
     environment:
-      STALWART_MINIO_ROOT_USER: ${STALWART_MINIO_ROOT_USER:-stalwart}
-      STALWART_MINIO_ROOT_PASSWORD: ${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
-      STALWART_MINIO_BUCKET: ${STALWART_MINIO_BUCKET:-stalwart}
+      - STALWART_MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
+      - STALWART_MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
+      - STALWART_MINIO_BUCKET=${STALWART_MINIO_BUCKET:-stalwart}
 
   stalwart-config:
     image: node:20-alpine
     restart: "no"
     environment:
-      STALWART_CONFIG_PATH: /opt/stalwart/etc/config.toml
-      STALWART_HOSTNAME: ${STALWART_HOSTNAME:-mail.example.com}
-      STALWART_DB_USER: ${STALWART_DB_USER:-stalwart}
-      STALWART_DB_PASSWORD: ${STALWART_DB_PASSWORD:-stalwart}
-      STALWART_DB_NAME: ${STALWART_DB_NAME:-stalwart}
-      STALWART_REDIS_PASSWORD: ${STALWART_REDIS_PASSWORD:-stalwart}
-      STALWART_MINIO_ROOT_USER: ${STALWART_MINIO_ROOT_USER:-stalwart}
-      STALWART_MINIO_ROOT_PASSWORD: ${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
-      STALWART_MINIO_BUCKET: ${STALWART_MINIO_BUCKET:-stalwart}
-      STALWART_MINIO_REGION: ${STALWART_MINIO_REGION:-us-east-1}
-      STALWART_MINIO_ENDPOINT: http://stalwart-minio:9000
+      - STALWART_CONFIG_PATH=/opt/stalwart/etc/config.toml
+      - STALWART_HOSTNAME=${STALWART_HOSTNAME:-mail.example.com}
+      - STALWART_ADMIN_USER=${STALWART_ADMIN_USER:-admin}
+      - STALWART_ADMIN_PASSWORD=${STALWART_ADMIN_PASSWORD:-change-me-stalwart-admin}
+      - STALWART_DB_USER=${STALWART_DB_USER:-stalwart}
+      - STALWART_DB_PASSWORD=${STALWART_DB_PASSWORD:-stalwart}
+      - STALWART_DB_NAME=${STALWART_DB_NAME:-stalwart}
+      - STALWART_REDIS_PASSWORD=${STALWART_REDIS_PASSWORD:-stalwart}
+      - STALWART_MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
+      - STALWART_MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
+      - STALWART_MINIO_BUCKET=${STALWART_MINIO_BUCKET:-stalwart}
+      - STALWART_MINIO_REGION=${STALWART_MINIO_REGION:-us-east-1}
+      - STALWART_MINIO_ENDPOINT=http://stalwart-minio:9000
     command: ["node", "/scripts/init.mjs"]
     volumes:
       - ./scripts/stalwart:/scripts:ro
