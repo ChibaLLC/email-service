@@ -4,7 +4,7 @@
 x-postal-runtime-common: &postal-runtime-common
   image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
   restart: unless-stopped
-  entrypoint: ["/docker-entrypoint.sh"]
+  entrypoint: [ "/docker-entrypoint.sh" ]
   environment:
     POSTAL_CONFIG_FILE_PATH: /config/postal.yml
     POSTAL_SIGNING_KEY_PATH: /config/signing.key
@@ -18,13 +18,42 @@ x-postal-depends-on: &postal-depends-on
     condition: service_healthy
   postal-init:
     condition: service_completed_successfully
+  postal-config:
+    condition: service_completed_successfully
 
 services:
+  # Generates postal.yml and signing.key into the shared config volume.
+  # Uses the same config.mjs logic as the host-side postal.mjs script — no duplication.
+  postal-config:
+    image: node:20-alpine
+    restart: "no"
+    environment:
+      POSTAL_CONFIG_DIR: /config
+      POSTAL_WEB_HOSTNAME: ${POSTAL_WEB_HOSTNAME:-postal.example.com}
+      POSTAL_WEB_PROTOCOL: ${POSTAL_WEB_PROTOCOL:-https}
+      POSTAL_SMTP_HOSTNAME: ${POSTAL_SMTP_HOSTNAME:-postal.example.com}
+      POSTAL_DB_ROOT_PASSWORD: ${POSTAL_DB_ROOT_PASSWORD:-postal}
+      POSTAL_DB_NAME: ${POSTAL_DB_NAME:-postal}
+      POSTAL_MESSAGE_DB_PREFIX: ${POSTAL_MESSAGE_DB_PREFIX:-postal}
+      POSTAL_RAILS_SECRET_KEY: ${POSTAL_RAILS_SECRET_KEY:-}
+      POSTAL_DNS_MX_RECORDS: ${POSTAL_DNS_MX_RECORDS:-}
+      POSTAL_DNS_SPF_INCLUDE: ${POSTAL_DNS_SPF_INCLUDE:-}
+      POSTAL_DNS_RETURN_PATH_DOMAIN: ${POSTAL_DNS_RETURN_PATH_DOMAIN:-}
+      POSTAL_DNS_ROUTE_DOMAIN: ${POSTAL_DNS_ROUTE_DOMAIN:-}
+      POSTAL_DNS_TRACK_DOMAIN: ${POSTAL_DNS_TRACK_DOMAIN:-}
+    command: [ "node", "/scripts/init.mjs" ]
+    volumes:
+      - ./scripts/postal:/scripts:ro
+      - postal_config_data:/config
+
+  # Fixes ownership then runs DB schema setup and migrations.
   postal-init:
     image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
     user: "0:0"
     restart: "no"
     depends_on:
+      postal-config:
+        condition: service_completed_successfully
       postal-db:
         condition: service_healthy
     environment:
@@ -36,53 +65,9 @@ services:
       - /bin/sh
       - -ec
       - |
-        mkdir -p /config
-        chown 999:999 /config
-
-        if [ ! -f /config/signing.key ]; then
-          if command -v openssl >/dev/null 2>&1; then
-            openssl genrsa -out /config/signing.key 2048
-          else
-            ruby -ropenssl -e "key = OpenSSL::PKey::RSA.new(2048); File.write('/config/signing.key', key.to_pem)"
-          fi
-
-          chown 999:999 /config/signing.key
-          chmod 600 /config/signing.key
-        fi
-
-        cat > /config/postal.yml <<EOF
-        version: 2
-
-        postal:
-          web_hostname: ${POSTAL_WEB_HOSTNAME:-postal.example.com}
-          web_protocol: ${POSTAL_WEB_PROTOCOL:-https}
-          smtp_hostname: ${POSTAL_SMTP_HOSTNAME:-postal.example.com}
-
-        main_db:
-          host: postal-db
-          username: root
-          password: ${POSTAL_DB_ROOT_PASSWORD:-postal}
-          database: ${POSTAL_DB_NAME:-postal}
-
-        message_db:
-          host: postal-db
-          username: root
-          password: ${POSTAL_DB_ROOT_PASSWORD:-postal}
-          prefix: ${POSTAL_MESSAGE_DB_PREFIX:-postal}
-
-        logging:
-          rails_log_enabled: true
-          highlighting_enabled: false
-
-        rails:
-          environment: development
-          secret_key: ${POSTAL_RAILS_SECRET_KEY:-change-me-in-production}
-        EOF
-
-        chown 999:999 /config/postal.yml
+        chown -R 999:999 /config
+        chmod 600 /config/signing.key
         chmod 640 /config/postal.yml
-
-        # Ensure Postal schema and migrations are applied before web/worker/smtp start.
         postal initialize
         postal update
     volumes:
@@ -99,7 +84,7 @@ services:
     volumes:
       - postal_db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping --host=127.0.0.1 --user=root --password=${POSTAL_DB_ROOT_PASSWORD:-postal}"]
+      test: [ "CMD-SHELL", "mariadb-admin ping --host=127.0.0.1 --user=root --password=${POSTAL_DB_ROOT_PASSWORD:-postal}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -108,14 +93,14 @@ services:
     <<: *postal-runtime-common
     depends_on:
       <<: *postal-depends-on
-    command: ["bundle", "exec", "puma", "-C", "config/puma.rb"]
+    command: [ "bundle", "exec", "puma", "-C", "config/puma.rb" ]
     environment:
       BIND_ADDRESS: 0.0.0.0
       PORT: 5000
     expose:
       - "5000"
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 5000"]
+      test: [ "CMD-SHELL", "nc -z 127.0.0.1 5000" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -126,7 +111,7 @@ services:
       <<: *postal-depends-on
       postal-web:
         condition: service_started
-    command: ["bundle", "exec", "ruby", "script/worker.rb"]
+    command: [ "bundle", "exec", "ruby", "script/worker.rb" ]
 
   postal-smtp:
     <<: *postal-runtime-common
@@ -134,11 +119,11 @@ services:
       <<: *postal-depends-on
       postal-web:
         condition: service_started
-    command: ["bundle", "exec", "ruby", "script/smtp_server.rb"]
+    command: [ "bundle", "exec", "ruby", "script/smtp_server.rb" ]
     expose:
       - "25"
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 25"]
+      test: [ "CMD-SHELL", "nc -z 127.0.0.1 25" ]
       interval: 10s
       timeout: 5s
       retries: 10

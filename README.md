@@ -195,6 +195,14 @@ For the fully containerized stack:
 docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
 ```
 
+Postal does not come with a default UI username/password in this repo. Create the first admin user with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postal.yml exec postal-web postal make-user
+```
+
+Use the email and password you enter in that prompt to sign in to the Postal UI.
+
 If you are running the app outside Docker, replace `POSTAL_API_URL` with your Traefik hostname or another externally reachable Postal URL.
 
 Use the dedicated guide for the full Postal bootstrapping flow, DNS records, Postal UI setup, and delivery requirements.

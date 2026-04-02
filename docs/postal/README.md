@@ -124,6 +124,14 @@ The Postal DNS values are intentionally validated in the Postal CLI rather than 
 
 After Postal is running, open Postal at the hostname your reverse proxy exposes for it. In a pure internal Docker setup, the app should still talk to Postal at `http://postal-web:5000`.
 
+Postal does not have a default username/password in this project. Create your first admin user with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postal.yml exec postal-web postal make-user
+```
+
+Use the email and password you provide in that prompt to sign in.
+
 The minimum Postal-side setup is:
 
 1. Create your first Postal user if this is a fresh instance.
