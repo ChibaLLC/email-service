@@ -38,7 +38,13 @@ export function buildStalwartConfig(env) {
   const acmeDnsOrigin = env.STALWART_ACME_DNS_ORIGIN || "";
 
   let dns01Config = "";
-  if (acmeEnabled && acmeChallenge === "dns-01" && acmeDnsProvider) {
+  if (acmeEnabled && acmeChallenge === "dns-01") {
+    if (!acmeDnsProvider) {
+      throw new Error(
+        "STALWART_ACME_CHALLENGE is dns-01 but STALWART_ACME_DNS_PROVIDER is not set. " +
+          "Set it to 'cloudflare' or 'rfc2136-tsig'.",
+      );
+    }
     const lines = [];
     lines.push(`provider = ${JSON.stringify(acmeDnsProvider)}`);
     lines.push(`polling-interval = ${JSON.stringify(acmeDnsPollingInterval)}`);
@@ -52,7 +58,13 @@ export function buildStalwartConfig(env) {
       const cfSecret = env.STALWART_ACME_DNS_CF_SECRET || "";
       const cfEmail = env.STALWART_ACME_DNS_CF_EMAIL || "";
       const cfTimeout = env.STALWART_ACME_DNS_CF_TIMEOUT || "30s";
-      if (cfSecret) lines.push(`secret = ${JSON.stringify(cfSecret)}`);
+      if (!cfSecret) {
+        throw new Error(
+          "STALWART_ACME_DNS_PROVIDER is cloudflare but STALWART_ACME_DNS_CF_SECRET is not set. " +
+            "Provide a Cloudflare API token with Zone:DNS:Edit permission.",
+        );
+      }
+      lines.push(`secret = ${JSON.stringify(cfSecret)}`);
       if (cfEmail) lines.push(`email = ${JSON.stringify(cfEmail)}`);
       lines.push(`timeout = ${JSON.stringify(cfTimeout)}`);
     } else if (acmeDnsProvider === "rfc2136-tsig") {
@@ -62,12 +74,20 @@ export function buildStalwartConfig(env) {
       const rfcAlgorithm = env.STALWART_ACME_DNS_RFC_ALGORITHM || "hmac-sha256";
       const rfcKey = env.STALWART_ACME_DNS_RFC_KEY || "";
       const rfcSecret = env.STALWART_ACME_DNS_RFC_SECRET || "";
-      if (rfcHost) lines.push(`host = ${JSON.stringify(rfcHost)}`);
+      if (!rfcHost) {
+        throw new Error("STALWART_ACME_DNS_PROVIDER is rfc2136-tsig but STALWART_ACME_DNS_RFC_HOST is not set.");
+      }
+      lines.push(`host = ${JSON.stringify(rfcHost)}`);
       lines.push(`port = ${parseInt(rfcPort, 10)}`);
       lines.push(`protocol = ${JSON.stringify(rfcProtocol)}`);
       lines.push(`tsig-algorithm = ${JSON.stringify(rfcAlgorithm)}`);
       if (rfcKey) lines.push(`key = ${JSON.stringify(rfcKey)}`);
       if (rfcSecret) lines.push(`secret = ${JSON.stringify(rfcSecret)}`);
+    } else {
+      throw new Error(
+        `Unsupported STALWART_ACME_DNS_PROVIDER: ${JSON.stringify(acmeDnsProvider)}. ` +
+          "Supported values: cloudflare, rfc2136-tsig.",
+      );
     }
 
     dns01Config = "\n" + lines.join("\n") + "\n";
