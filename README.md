@@ -7,12 +7,11 @@ Production-ready email service with queue processing, provider-agnostic architec
 ### 1. Docker Compose
 
 ```bash
-pnpm listmonk:prepare
-pnpm postal:prepare
 docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
 ```
 
 This starts the app, PostgreSQL, Redis, Listmonk, and Postal on the internal Docker network.
+Postal and Listmonk configuration artifacts are generated automatically by one-shot init services during startup, so no separate prepare step is required for Dokploy-style deployments.
 Use Traefik or another reverse proxy to publish the services you want externally.
 
 If you only want the app stack plus Listmonk:
@@ -193,7 +192,6 @@ DEFAULT_FROM=verified-sender@example.com
 For the fully containerized stack:
 
 ```bash
-pnpm postal:prepare
 docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
 ```
 

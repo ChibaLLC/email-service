@@ -2,6 +2,53 @@
 # Use with docker-compose.dev.yml through `pnpm dev:start:postal` or `pnpm postal:up`.
 
 services:
+  postal-init:
+    image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
+    restart: "no"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /config
+        if [ ! -f /config/signing.key ]; then
+          if command -v openssl >/dev/null 2>&1; then
+            openssl genrsa -out /config/signing.key 2048
+          else
+            ruby -ropenssl -e "key = OpenSSL::PKey::RSA.new(2048); File.write('/config/signing.key', key.to_pem)"
+          fi
+        fi
+
+        cat > /config/postal.yml <<EOF
+        version: 2
+
+        postal:
+          web_hostname: ${POSTAL_WEB_HOSTNAME:-postal.example.com}
+          web_protocol: ${POSTAL_WEB_PROTOCOL:-https}
+          smtp_hostname: ${POSTAL_SMTP_HOSTNAME:-postal.example.com}
+
+        main_db:
+          host: postal-db
+          username: root
+          password: ${POSTAL_DB_ROOT_PASSWORD:-postal}
+          database: ${POSTAL_DB_NAME:-postal}
+
+        message_db:
+          host: postal-db
+          username: root
+          password: ${POSTAL_DB_ROOT_PASSWORD:-postal}
+          prefix: ${POSTAL_MESSAGE_DB_PREFIX:-postal}
+
+        logging:
+          rails_log_enabled: true
+          highlighting_enabled: false
+
+        rails:
+          environment: development
+          secret_key: ${POSTAL_RAILS_SECRET_KEY:-change-me-in-production}
+        EOF
+    volumes:
+      - postal_config_data:/config
+
   postal-db:
     image: mariadb:11
     restart: unless-stopped
@@ -24,6 +71,8 @@ services:
     depends_on:
       postal-db:
         condition: service_healthy
+      postal-init:
+        condition: service_completed_successfully
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["bundle", "exec", "puma", "-C", "config/puma.rb"]
     environment:
@@ -36,7 +85,7 @@ services:
     expose:
       - "5000"
     volumes:
-      - ./docker/postal/config:/config
+      - postal_config_data:/config
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 5000"]
       interval: 10s
@@ -51,6 +100,8 @@ services:
         condition: service_healthy
       postal-web:
         condition: service_started
+      postal-init:
+        condition: service_completed_successfully
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["bundle", "exec", "ruby", "script/worker.rb"]
     environment:
@@ -59,7 +110,7 @@ services:
       WAIT_FOR_TIMEOUT: 90
       WAIT_FOR_TARGETS: postal-db:3306
     volumes:
-      - ./docker/postal/config:/config
+      - postal_config_data:/config
 
   postal-smtp:
     image: ${POSTAL_IMAGE:-ghcr.io/postalserver/postal:latest}
@@ -69,6 +120,8 @@ services:
         condition: service_healthy
       postal-web:
         condition: service_started
+      postal-init:
+        condition: service_completed_successfully
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["bundle", "exec", "ruby", "script/smtp_server.rb"]
     environment:
@@ -79,7 +132,7 @@ services:
     expose:
       - "25"
     volumes:
-      - ./docker/postal/config:/config
+      - postal_config_data:/config
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 25"]
       interval: 10s
@@ -88,3 +141,4 @@ services:
 
 volumes:
   postal_db_data:
+  postal_config_data:

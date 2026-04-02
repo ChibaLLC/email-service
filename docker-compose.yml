@@ -53,7 +53,9 @@ services:
     depends_on:
       listmonk-db:
         condition: service_healthy
-    command: ["sh", "-c", "./listmonk --install --idempotent --yes --config /listmonk/config.toml && ./listmonk --upgrade --yes --config /listmonk/config.toml && ./listmonk --config /listmonk/config.toml"]
+      listmonk-init:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "./listmonk --install --idempotent --yes --config /config/config.toml && ./listmonk --upgrade --yes --config /config/config.toml && ./listmonk --config /config/config.toml"]
     environment:
       TZ: ${LISTMONK_TIMEZONE:-Etc/UTC}
       LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:-}
@@ -61,13 +63,40 @@ services:
     expose:
       - "9000"  
     volumes:
-      - ./docker/listmonk/config/config.toml:/listmonk/config.toml:ro
-      - ./docker/listmonk/uploads:/listmonk/uploads
+      - listmonk_config_data:/config:ro
+      - listmonk_uploads_data:/listmonk/uploads
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  listmonk-init:
+    image: alpine:3.20
+    restart: "no"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /config /uploads
+        cat > /config/config.toml <<'EOF'
+        [app]
+        address = "0.0.0.0:${LISTMONK_APP_PORT:-9000}"
+
+        [db]
+        host = "listmonk-db"
+        port = 5432
+        user = "${LISTMONK_DB_USER:-listmonk}"
+        password = "${LISTMONK_DB_PASSWORD:-listmonk}"
+        database = "${LISTMONK_DB_NAME:-listmonk}"
+        ssl_mode = "disable"
+        max_open = 25
+        max_idle = 25
+        max_lifetime = "300s"
+        EOF
+    volumes:
+      - listmonk_config_data:/config
+      - listmonk_uploads_data:/uploads
 
   app:
     build:
@@ -91,3 +120,5 @@ volumes:
   postgres_data:
   redis_data:
   listmonk_db_data:
+  listmonk_config_data:
+  listmonk_uploads_data:

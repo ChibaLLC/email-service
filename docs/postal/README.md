@@ -40,9 +40,10 @@ For real outbound delivery beyond local testing, you also need:
 For a containerized deployment behind Traefik:
 
 ```bash
-pnpm postal:prepare
 docker compose -f docker-compose.yml -f docker-compose.postal.yml --env-file .env up -d
 ```
+
+Postal config and signing key are generated automatically at startup by the `postal-init` one-shot service, so no manual prepare command is required for Dokploy deployments.
 
 For native Nuxt development with Postal running in containers:
 

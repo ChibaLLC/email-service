@@ -24,9 +24,10 @@ This repo supports two Listmonk usage modes:
 For the full containerized stack, use Docker Compose directly after generating the Listmonk config file:
 
 ```bash
-pnpm listmonk:prepare
 docker compose -f docker-compose.yml --env-file .env up -d
 ```
+
+Listmonk config and upload directories are generated automatically at startup by the `listmonk-init` one-shot service, so no manual prepare command is required for Dokploy deployments.
 
 For native Nuxt development with only the infrastructure and Listmonk in containers:
 
