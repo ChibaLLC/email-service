@@ -4,19 +4,19 @@ This guide covers the Postal-specific setup for this repo: starting the local Po
 
 This repo supports two Postal usage modes:
 
-- Local Postal for development via the compose overlay in [docker-compose.postal.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.postal.yml)
+- Local Postal for development via the compose overlay in [docker-compose.postal.yml](../../docker-compose.postal.yml)
 - External Postal by pointing the app at an existing Postal instance with `POSTAL_API_URL`
 
 ## What This Repo Provides
 
 The repo already includes:
 
-- A Postal provider implementation in [server/email/providers/postal.ts](/home/allanbosire/Desktop/chiba/email-service/server/email/providers/postal.ts)
-- Provider env validation in [server/email/config.ts](/home/allanbosire/Desktop/chiba/email-service/server/email/config.ts)
-- A Postal compose overlay in [docker-compose.postal.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.postal.yml)
-- A Node-based Postal CLI in [scripts/postal.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/postal.mjs)
-- Reusable Postal config helpers in [scripts/postal/config.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/postal/config.mjs) and [scripts/postal/env.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/postal/env.mjs)
-- Dev scripts in [package.json](/home/allanbosire/Desktop/chiba/email-service/package.json)
+- A Postal provider implementation in [server/email/providers/postal.ts](../../server/email/providers/postal.ts)
+- Provider env validation in [server/email/config.ts](../../server/email/config.ts)
+- A Postal compose overlay in [docker-compose.postal.yml](../../docker-compose.postal.yml)
+- A Node-based Postal CLI in [scripts/postal.mjs](../../scripts/postal.mjs)
+- Reusable Postal config helpers in [scripts/postal/config.mjs](../../scripts/postal/config.mjs) and [scripts/postal/env.mjs](../../scripts/postal/env.mjs)
+- Dev scripts in [package.json](../../package.json)
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ Before using Postal with this repo, make sure you have:
 - Docker and Docker Compose working locally
 - Node and `pnpm` installed
 - The base app dependencies installed with `pnpm install`
-- A `.env` file copied from [.env.example](/home/allanbosire/Desktop/chiba/email-service/.env.example) if you are not letting the dev scripts create it for you
+- A `.env` file copied from [.env.example](../../.env.example) if you are not letting the dev scripts create it for you
 
 For real outbound delivery beyond local testing, you also need:
 
@@ -51,7 +51,7 @@ For native Nuxt development with Postal running in containers:
 pnpm dev:start:postal
 ```
 
-That command uses the generic dev orchestrator in [scripts/dev.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/dev.mjs) with the Postal overlay enabled.
+That command uses the generic dev orchestrator in [scripts/dev.mjs](../../scripts/dev.mjs) with the Postal overlay enabled.
 
 On first run the helper will prepare local Postal config under `docker/postal/config/`, then start:
 
@@ -98,7 +98,7 @@ Notes:
 - `POSTAL_SERVER_API_KEY` is a Postal server API credential created inside Postal
 - `DEFAULT_FROM` must be an address your Postal server is allowed to send from
 
-The app validates these values at startup through [server/plugins/00.email-config.ts](/home/allanbosire/Desktop/chiba/email-service/server/plugins/00.email-config.ts). If they are missing or invalid, startup fails early.
+The app validates these values at startup through [server/plugins/00.email-config.ts](../../server/plugins/00.email-config.ts). If they are missing or invalid, startup fails early.
 
 ### 3. Optional: configure Postal DNS values from env
 
@@ -116,7 +116,7 @@ Validation rules:
 
 - If you set any `POSTAL_DNS_*` value, `POSTAL_DNS_MX_RECORDS`, `POSTAL_DNS_SPF_INCLUDE`, and `POSTAL_DNS_RETURN_PATH_DOMAIN` become required
 - `POSTAL_DNS_MX_RECORDS` must be a comma-separated list of valid hostnames
-- All configured `POSTAL_DNS_*` values are validated by [scripts/postal.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/postal.mjs) before `postal.yml` is written
+- All configured `POSTAL_DNS_*` values are validated by [scripts/postal.mjs](../../scripts/postal.mjs) before `postal.yml` is written
 
 The Postal DNS values are intentionally validated in the Postal CLI rather than the app provider config because they belong to the generated Postal server configuration, not to this app's HTTP send credentials.
 
@@ -199,7 +199,7 @@ dns:
 
 Replace those example values with your real hostnames and domains.
 
-If you set the matching `POSTAL_DNS_*` env vars described above, [scripts/postal.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/postal.mjs) will render this block into the generated `postal.yml` automatically.
+If you set the matching `POSTAL_DNS_*` env vars described above, [scripts/postal.mjs](../../scripts/postal.mjs) will render this block into the generated `postal.yml` automatically.
 
 ## Important Caveats
 
@@ -213,14 +213,14 @@ These are the main things people usually miss when getting started with Postal:
 
 ## Local Overlay Notes
 
-The Postal CLI in [scripts/postal.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/postal.mjs) generates:
+The Postal CLI in [scripts/postal.mjs](../../scripts/postal.mjs) generates:
 
 - `docker/postal/config/postal.yml`
 - `docker/postal/config/signing.key`
 
 `postal.yml` is regenerated from env values each time you run `pnpm postal:prepare`, `pnpm postal:prepare:force`, `pnpm postal:up`, `pnpm postal:reset`, or `pnpm dev:start:postal`. That is intentional so changes to `POSTAL_*` and `POSTAL_DNS_*` values are reflected without manually deleting the file first.
 
-Those generated files are intentionally ignored by Git via [.gitignore](/home/allanbosire/Desktop/chiba/email-service/.gitignore).
+Those generated files are intentionally ignored by Git via [.gitignore](../../.gitignore).
 
 The current local overlay starts Postal web, worker, and SMTP roles plus Postal MariaDB. It is designed to get this app integrated with Postal locally; it is not a full recommendation for internet-facing Postal hosting.
 
@@ -233,7 +233,7 @@ Once your Postal server API key is in `.env`, verify the integration with this a
 3. Use the dashboard test email flow or `POST /send`.
 4. Check the Postal UI to confirm the message reached Postal.
 
-If the app fails on startup, the first place to look is [server/email/config.ts](/home/allanbosire/Desktop/chiba/email-service/server/email/config.ts) because the provider validation is intentionally strict.
+If the app fails on startup, the first place to look is [server/email/config.ts](../../server/email/config.ts) because the provider validation is intentionally strict.
 
 ## Official Postal References
 

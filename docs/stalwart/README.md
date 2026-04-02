@@ -1,41 +1,45 @@
 # Stalwart Setup
 
-This guide covers the Stalwart-specific setup for this repo: running the production-oriented Stalwart stack alongside the app and using it from the app through the existing nodemailer provider.
+This guide covers the Stalwart-specific setup for this repo: running the production-oriented Stalwart stack from the consolidated production compose file, using it from the app through the existing nodemailer provider, and combining it with Postal when needed.
 
 ## What This Repo Provides
 
-- A production Stalwart compose overlay in [docker-compose.stalwart.yml](c:/Users/AllanBosire/Desktop/email-service/docker-compose.stalwart.yml)
-- A Stalwart config generator in [scripts/stalwart/config.mjs](c:/Users/AllanBosire/Desktop/email-service/scripts/stalwart/config.mjs) and [scripts/stalwart/init.mjs](c:/Users/AllanBosire/Desktop/email-service/scripts/stalwart/init.mjs)
-- App integration through the existing nodemailer provider in [server/email/providers/nodemailer.ts](c:/Users/AllanBosire/Desktop/email-service/server/email/providers/nodemailer.ts)
+- A production Stalwart compose definition in [docker-compose.stalwart.yml](../../docker-compose.stalwart.yml)
+- A consolidated production compose file in [docker-compose.prod.yml](../../docker-compose.prod.yml) that includes the base app services plus Stalwart, Postal, and Listmonk
+- A Stalwart config generator in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) and [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs)
+- App integration through the existing nodemailer provider in [server/email/providers/nodemailer.ts](../../server/email/providers/nodemailer.ts)
 
 ## Quick Start
 
-### 1. Start the production-oriented Stalwart stack
+### 1. Start the production stack
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.stalwart.yml --env-file .env up -d
+docker compose -f ./docker-compose.prod.yml --env-file .env up
 ```
 
-This starts the app stack plus:
+This starts the full production stack, including:
 
+- the app
+- Postal
+- Listmonk
 - Stalwart
 - dedicated PostgreSQL for Stalwart metadata and internal directory state
 - dedicated Redis for lookup and in-memory state
 - dedicated MinIO for blob/object storage
 - one-shot init services that create the MinIO bucket and write the Stalwart `config.toml`
 
-The production overlay publishes the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, `4190`, `8080`, and `443`.
+The Stalwart services publish the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, `4190`, `8080`, and `443`.
 
-If you deploy with the repo's consolidated prod file, Stalwart is also available through [docker-compose.prod.yml](c:/Users/AllanBosire/Desktop/email-service/docker-compose.prod.yml).
+If you prefer detached startup, use `docker compose -f ./docker-compose.prod.yml --env-file .env up -d`.
 
 ## First Login
 
 Stalwart creates an initial admin account automatically on first boot. Read it from the container logs:
 
-For containerized deployment:
+For the consolidated production stack:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.stalwart.yml --env-file .env logs stalwart
+docker compose -f ./docker-compose.prod.yml --env-file .env logs stalwart
 ```
 
 The logs include a line like:
@@ -45,6 +49,17 @@ Your administrator account is 'admin' with password '...'
 ```
 
 Use those credentials to sign in to the Stalwart web UI.
+
+## Using Stalwart With Postal
+
+Stalwart can run in the same deployment as Postal because [docker-compose.prod.yml](../../docker-compose.prod.yml) includes both sets of services.
+
+Typical split:
+
+- Use Postal for transactional or API-driven sending.
+- Use Stalwart for employee mailboxes, IMAP/POP/JMAP access, or authenticated SMTP submission.
+
+The app only sends through one configured provider at a time. If you want the app to send through Stalwart, use the nodemailer settings shown below. If you want the app to send through Postal instead, switch back to the Postal provider env configuration documented in [docs/postal/README.md](../postal/README.md).
 
 ## Configure Stalwart In Production
 
@@ -70,7 +85,7 @@ After first login:
 
 Stalwart generates its own recommended DNS records per configured domain, including SPF, DKIM, DMARC, and optional autoconfig/SRV guidance.
 
-Important production env keys in [.env.example](c:/Users/AllanBosire/Desktop/email-service/.env.example):
+Important production env keys in [.env.example](../../.env.example):
 
 - `STALWART_HOSTNAME`
 - `STALWART_DB_USER`
@@ -86,7 +101,7 @@ Important production env keys in [.env.example](c:/Users/AllanBosire/Desktop/ema
 
 The app does not need a new provider for Stalwart. Use the existing nodemailer provider.
 
-For the containerized stack, set `.env` like this:
+For the consolidated production stack, set `.env` like this when the app should send through Stalwart:
 
 ```bash
 EMAIL_PROVIDER=nodemailer
@@ -97,7 +112,7 @@ SMTP_PASS=your-stalwart-password
 DEFAULT_FROM=your-stalwart-account@example.com
 ```
 
-Because [server/email/providers/nodemailer.ts](c:/Users/AllanBosire/Desktop/email-service/server/email/providers/nodemailer.ts) treats port `465` as implicit TLS and all other ports as non-implicit TLS, `587` is the safest default for authenticated submission.
+Because [server/email/providers/nodemailer.ts](../../server/email/providers/nodemailer.ts) treats port `465` as implicit TLS and all other ports as non-implicit TLS, `587` is the safest default for authenticated submission.
 
 ## Notes
 

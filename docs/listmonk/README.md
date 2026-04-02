@@ -4,18 +4,18 @@ This guide covers the Listmonk-specific setup for this repo: starting the local 
 
 This repo supports two Listmonk usage modes:
 
-- The containerized app stack in [docker-compose.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.yml), which now includes Listmonk by default
-- Local native-dev Listmonk via the compose overlay in [docker-compose.listmonk.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.listmonk.yml)
+- The containerized app stack in [docker-compose.yml](../../docker-compose.yml), which now includes Listmonk by default
+- Local native-dev Listmonk via the compose overlay in [docker-compose.listmonk.yml](../../docker-compose.listmonk.yml)
 - External Listmonk by pointing the app at an existing Listmonk instance with `LISTMONK_API_URL`
 
 ## What This Repo Provides
 
-- A Listmonk proxy config helper in [server/listmonk/config.ts](/home/allanbosire/Desktop/chiba/email-service/server/listmonk/config.ts)
-- Dashboard-authenticated Listmonk proxy routes in [server/api/dashboard/listmonk/index.ts](/home/allanbosire/Desktop/chiba/email-service/server/api/dashboard/listmonk/index.ts) and [server/api/dashboard/listmonk/[...path].ts](/home/allanbosire/Desktop/chiba/email-service/server/api/dashboard/listmonk/[...path].ts)
-- Listmonk services in the main container stack at [docker-compose.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.yml)
-- A Listmonk compose overlay in [docker-compose.listmonk.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.listmonk.yml)
-- A Node-based Listmonk CLI in [scripts/listmonk.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/listmonk.mjs)
-- Reusable Listmonk config helpers in [scripts/listmonk/config.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/listmonk/config.mjs) and [scripts/listmonk/env.mjs](/home/allanbosire/Desktop/chiba/email-service/scripts/listmonk/env.mjs)
+- A Listmonk proxy config helper in [server/listmonk/config.ts](../../server/listmonk/config.ts)
+- Dashboard-authenticated Listmonk proxy routes in [server/api/dashboard/listmonk/index.ts](../../server/api/dashboard/listmonk/index.ts) and [server/api/dashboard/listmonk/[...path].ts](../../server/api/dashboard/listmonk/[...path].ts)
+- Listmonk services in the main container stack at [docker-compose.yml](../../docker-compose.yml)
+- A Listmonk compose overlay in [docker-compose.listmonk.yml](../../docker-compose.listmonk.yml)
+- A Node-based Listmonk CLI in [scripts/listmonk.mjs](../../scripts/listmonk.mjs)
+- Reusable Listmonk config helpers in [scripts/listmonk/config.mjs](../../scripts/listmonk/config.mjs) and [scripts/listmonk/env.mjs](../../scripts/listmonk/env.mjs)
 
 ## Quick Start
 
@@ -106,7 +106,7 @@ Examples:
 
 Query strings and request bodies are forwarded.
 
-Because the route sits under `/api/dashboard`, it is already covered by the dashboard auth middleware in [server/middleware/dashboard-auth.ts](/home/allanbosire/Desktop/chiba/email-service/server/middleware/dashboard-auth.ts).
+Because the route sits under `/api/dashboard`, it is already covered by the dashboard auth middleware in [server/middleware/dashboard-auth.ts](../../server/middleware/dashboard-auth.ts).
 
 ## Important Constraint
 
@@ -141,7 +141,7 @@ The Listmonk CLI generates:
 - `docker/listmonk/config/config.toml`
 - `docker/listmonk/uploads/`
 
-Those generated files are intentionally ignored by Git via [.gitignore](/home/allanbosire/Desktop/chiba/email-service/.gitignore).
+Those generated files are intentionally ignored by Git via [.gitignore](../../.gitignore).
 
 `config.toml` is regenerated from env values each time you run `pnpm listmonk:prepare`, `pnpm listmonk:prepare:force`, `pnpm listmonk:up`, `pnpm listmonk:reset`, or `pnpm dev:start:listmonk`.
 

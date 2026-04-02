@@ -178,7 +178,7 @@ await mailchimp.messages.send({
 
 ## Using Postal
 
-Postal setup is documented in detail in [docs/postal/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/postal/README.md).
+Postal setup is documented in detail in [docs/postal/README.md](docs/postal/README.md).
 
 Minimum app configuration:
 
@@ -207,23 +207,24 @@ If you are running the app outside Docker, replace `POSTAL_API_URL` with your Tr
 
 Use the dedicated guide for the full Postal bootstrapping flow, DNS records, Postal UI setup, and delivery requirements.
 
-See [docs/postal/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/postal/README.md).
+See [docs/postal/README.md](docs/postal/README.md).
 
 ## Using Listmonk
 
 Listmonk is integrated here as a proxied mailing-list service, not as an email provider.
 
-The containerized stack in [docker-compose.yml](/home/allanbosire/Desktop/chiba/email-service/docker-compose.yml) includes Listmonk by default. In Docker Compose, point the app at `http://listmonk-app:9000`; if you are calling Listmonk from outside Docker, use your Traefik hostname instead.
+The containerized stack in [docker-compose.yml](docker-compose.yml) includes Listmonk by default. In Docker Compose, point the app at `http://listmonk-app:9000`; if you are calling Listmonk from outside Docker, use your Traefik hostname instead.
 
 Use the dedicated guide for the Listmonk overlay, proxy configuration, and dashboard API usage.
 
-See [docs/listmonk/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/listmonk/README.md).
+See [docs/listmonk/README.md](docs/listmonk/README.md).
 
 ## Using Stalwart
 
-Stalwart setup is documented in detail in [docs/stalwart/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/stalwart/README.md).
+Stalwart setup is documented in detail in [docs/stalwart/README.md](docs/stalwart/README.md).
 
 Stalwart is a full mail stack. The app uses it through the existing nodemailer provider rather than a custom Stalwart API provider.
+It can also run in the same deployment as Postal when you want separate mail roles, for example Postal for transactional traffic and Stalwart for user mailboxes or authenticated SMTP accounts.
 
 Minimum app configuration:
 
@@ -236,15 +237,17 @@ SMTP_PASS=your-stalwart-password
 DEFAULT_FROM=your-stalwart-account@example.com
 ```
 
-For the production-oriented stack with dedicated PostgreSQL, MinIO, and Redis services prewired from first boot:
+For the consolidated production stack:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.stalwart.yml --env-file .env up -d
+docker compose -f ./docker-compose.prod.yml --env-file .env up
 ```
 
-Use the dedicated guide for first login, storage topology, port mapping, domain setup, DNS, and SMTP configuration details.
+That compose file includes the base app services plus Postal, Listmonk, and Stalwart. If you keep both Postal and Stalwart enabled, point the app at the service you actually want to send through by setting `EMAIL_PROVIDER` and the matching SMTP or API credentials in `.env`.
 
-See [docs/stalwart/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/stalwart/README.md).
+Use the dedicated guide for first login, storage topology, coexistence with Postal, domain setup, DNS, and SMTP configuration details.
+
+See [docs/stalwart/README.md](docs/stalwart/README.md).
 
 ## Startup Validation
 
