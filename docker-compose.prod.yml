@@ -29,6 +29,36 @@
       file: docker-compose.yml
       service: app
 
+  stalwart-db:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-db
+
+  stalwart-redis:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-redis
+
+  stalwart-minio:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-minio
+
+  stalwart-minio-init:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-minio-init
+
+  stalwart-config:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-config
+
+  stalwart:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart
+
   postal-config:
     extends:
       file: docker-compose.postal.yml
@@ -65,5 +95,9 @@ volumes:
   listmonk_db_data:
   listmonk_config_data:
   listmonk_uploads_data:
+  stalwart_data:
+  stalwart_db_data:
+  stalwart_redis_data:
+  stalwart_minio_data:
   postal_db_data:
   postal_config_data:

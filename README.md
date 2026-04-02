@@ -219,6 +219,33 @@ Use the dedicated guide for the Listmonk overlay, proxy configuration, and dashb
 
 See [docs/listmonk/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/listmonk/README.md).
 
+## Using Stalwart
+
+Stalwart setup is documented in detail in [docs/stalwart/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/stalwart/README.md).
+
+Stalwart is a full mail stack. The app uses it through the existing nodemailer provider rather than a custom Stalwart API provider.
+
+Minimum app configuration:
+
+```bash
+EMAIL_PROVIDER=nodemailer
+SMTP_HOST=stalwart
+SMTP_PORT=587
+SMTP_USER=your-stalwart-account@example.com
+SMTP_PASS=your-stalwart-password
+DEFAULT_FROM=your-stalwart-account@example.com
+```
+
+For the production-oriented stack with dedicated PostgreSQL, MinIO, and Redis services prewired from first boot:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.stalwart.yml --env-file .env up -d
+```
+
+Use the dedicated guide for first login, storage topology, port mapping, domain setup, DNS, and SMTP configuration details.
+
+See [docs/stalwart/README.md](/home/allanbosire/Desktop/chiba/email-service/docs/stalwart/README.md).
+
 ## Startup Validation
 
 The server validates the selected email provider configuration during Nitro startup. If the selected provider is missing required environment variables, startup fails with a provider-specific error message that lists the missing or invalid keys.

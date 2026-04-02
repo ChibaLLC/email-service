@@ -23,13 +23,13 @@ const PROJECT_NAME = "email-service-dev";
 const OPTIONAL_SERVICES = {
   listmonk: {
     composeFile: resolve(ROOT, "docker-compose.listmonk.yml"),
-    prepareCommand: 'node scripts/listmonk.mjs prepare',
-    label: 'Listmonk',
+    prepareCommand: "node scripts/listmonk.mjs prepare",
+    label: "Listmonk",
   },
   postal: {
     composeFile: resolve(ROOT, "docker-compose.postal.yml"),
-    prepareCommand: 'node scripts/postal.mjs prepare',
-    label: 'Postal',
+    prepareCommand: "node scripts/postal.mjs prepare",
+    label: "Postal",
   },
 };
 
@@ -152,7 +152,12 @@ function validateEnabledServices(services) {
 }
 
 function getComposeFiles(enabledServices) {
-  return [COMPOSE_FILE, ...enabledServices.map((service) => OPTIONAL_SERVICES[service].composeFile)];
+  return [
+    COMPOSE_FILE,
+    ...enabledServices.flatMap(
+      (service) => OPTIONAL_SERVICES[service].composeFiles || [OPTIONAL_SERVICES[service].composeFile],
+    ),
+  ];
 }
 
 function compose(args, enabledServices = []) {
