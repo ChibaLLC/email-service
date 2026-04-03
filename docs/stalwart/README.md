@@ -31,6 +31,19 @@ This starts the full production stack, including:
 
 The Stalwart services publish the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, and `4190`.
 
+> [!IMPORTANT]
+> Many VPS and cloud providers partially block or rate-limit SMTP on port `25` at the provider edge. In that case, Stalwart can be healthy and local tests can still pass, while some external delivery checkers report a timeout.
+> This is not always a Stalwart or Docker issue.
+>
+> Before debugging container config, confirm end-to-end reachability from multiple external networks:
+>
+> ```bash
+> nc -vz your-mail-hostname 25
+> openssl s_client -starttls smtp -connect your-mail-hostname:25 -servername your-mail-hostname
+> ```
+>
+> If remote testers still time out, verify provider firewall policy and request SMTP port `25` opening/unblocking with your provider support.
+
 If you prefer detached startup, use `docker compose -f ./docker-compose.prod.yml --env-file .env up -d`.
 
 If startup fails because one of the Stalwart mail ports is already in use on the host, there is a helpful script you can run on the server before retrying:
