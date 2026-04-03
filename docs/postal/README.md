@@ -97,6 +97,14 @@ Notes:
 - If the app is outside Docker, use your Traefik hostname or another reachable Postal URL instead
 - `POSTAL_SERVER_API_KEY` is a Postal server API credential created inside Postal
 - `DEFAULT_FROM` must be an address your Postal server is allowed to send from
+- `POSTAL_ALLOWED_HOSTS` is optional and accepts a comma-separated list of extra Rails host authorization entries for Postal web
+
+Host authorization note:
+
+- Postal itself only allowlists its configured web hostname by default
+- This repo's Postal overlay mounts a small Rails initializer that always allowlists `postal-web:5000`
+- If you need extra hostnames, add them with `POSTAL_ALLOWED_HOSTS`, for example `POSTAL_ALLOWED_HOSTS=postal.internal.example.com,postal-admin.example.com`
+- That avoids Rails host authorization failures when the app calls Postal over Docker's internal service network but users still open the Postal UI through a different public hostname
 
 The app validates these values at startup through [server/plugins/00.email-config.ts](../../server/plugins/00.email-config.ts). If they are missing or invalid, startup fails early.
 

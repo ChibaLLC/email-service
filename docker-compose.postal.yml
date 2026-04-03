@@ -97,8 +97,12 @@ services:
     environment:
       BIND_ADDRESS: 0.0.0.0
       PORT: 5000
+      POSTAL_ALLOWED_HOSTS: ${POSTAL_ALLOWED_HOSTS:-}
     expose:
       - "5000"
+    volumes:
+      - postal_config_data:/config
+      - ./scripts/postal/host_authorization.rb:/opt/postal/app/config/initializers/99_host_authorization.rb:ro
     healthcheck:
       test: [ "CMD-SHELL", "nc -z 127.0.0.1 5000" ]
       interval: 10s

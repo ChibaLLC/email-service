@@ -189,6 +189,10 @@ POSTAL_SERVER_API_KEY=postal_server_api_key
 DEFAULT_FROM=verified-sender@example.com
 ```
 
+For the bundled Postal Docker overlay, the Postal web container now explicitly allowlists the internal Docker host `postal-web:5000` for Rails host authorization. That is required because the app talks to Postal over the internal service URL while Postal itself may still advertise a different public `POSTAL_WEB_HOSTNAME` for browser access.
+
+If you need more allowed hosts, set `POSTAL_ALLOWED_HOSTS` in `.env` as a comma-separated list such as `POSTAL_ALLOWED_HOSTS=postal.internal.example.com,postal-admin.example.com`.
+
 For the fully containerized stack:
 
 ```bash
