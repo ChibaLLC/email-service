@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { getDefaultFromAddress, parseEmailProviderConfig, type PostalConfig } from "../config";
 import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "../types";
+import type { FetchError } from "ofetch";
+import { consola } from "consola";
 
 type PostalResponse = {
   status?: string;
@@ -13,7 +15,7 @@ type PostalResponse = {
   message?: string;
   error?: string;
 };
-
+const console = consola.withTag("PostalProvider");
 function getSendEndpoint(apiUrl: string): string {
   const trimmed = apiUrl.replace(/\/+$/, "");
 
@@ -88,29 +90,29 @@ export class PostalProvider implements EmailProvider {
         ? await Promise.all(message.attachments.map((attachment) => mapAttachment(attachment)))
         : undefined;
 
-      const response = await fetch(this.sendEndpoint, {
+      const payload = await $fetch<PostalResponse>(this.sendEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Server-API-Key": this.config.POSTAL_SERVER_API_KEY,
         },
-        body: JSON.stringify({
+        body: {
           from: message.from || getDefaultFromAddress(this.config),
           to: Array.isArray(message.to) ? message.to : [message.to],
           subject: message.subject,
           ...(message.text ? { plain_body: message.text } : {}),
           ...(message.html ? { html_body: message.html } : {}),
           ...(attachments?.length ? { attachments } : {}),
-        }),
+        },
+      }).catch((error) => {
+        const {message, response} = error as FetchError;
+        const errorMessage = response ? getErrorMessage(response._data as PostalResponse, response) : message || String(error);
+        throw new Error(`Postal API request failed: ${errorMessage}`);
       });
 
-      const payload = (await response.json().catch(() => null)) as PostalResponse | null;
-
-      if (!response.ok || payload?.status === "error") {
-        return {
-          success: false,
-          error: getErrorMessage(payload, response),
-        };
+      if(payload.status !== "success") {
+        const errorMessage = getErrorMessage(payload, new Response("", { status: 500, statusText: "Internal Server Error" }));
+        throw new Error(`Postal API responded with error: ${errorMessage}`);
       }
 
       return {
