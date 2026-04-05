@@ -26,7 +26,7 @@ services:
     depends_on:
       listmonk-db:
         condition: service_healthy
-    command: ["sh", "-c", "./listmonk --install --idempotent --yes --config /listmonk/config.toml && ./listmonk --upgrade --yes --config /listmonk/config.toml && ./listmonk --config /listmonk/config.toml"]
+    command: ["sh", "-c", "./listmonk --install --idempotent --yes --config /listmonk/config/config.toml && ./listmonk --upgrade --yes --config /listmonk/config/config.toml && ./listmonk --config /listmonk/config/config.toml"]
     environment:
       TZ: ${LISTMONK_TIMEZONE:-Etc/UTC}
       LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:-}
@@ -34,8 +34,8 @@ services:
     expose:
       - "9000"
     volumes:
-      - ./docker/listmonk/config/config.toml:/listmonk/config.toml:ro
-      - ./docker/listmonk/uploads:/listmonk/uploads
+      - listmonk_config_data:/listmonk/config
+      - listmonk_uploads_data:/listmonk/uploads
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
       interval: 10s
@@ -44,3 +44,4 @@ services:
 
 volumes:
   listmonk_db_data:
+  listmonk_uploads_data:
