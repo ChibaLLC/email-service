@@ -21,6 +21,7 @@ export function buildStalwartConfig(env) {
   const acmeEnabled = env.STALWART_ACME_ENABLED === "true";
   const acmeDirectory = env.STALWART_ACME_DIRECTORY || "https://acme-v02.api.letsencrypt.org/directory";
   const acmeChallenge = env.STALWART_ACME_CHALLENGE || "tls-alpn-01";
+  const httpProtocol = env.STALWART_HTTP_PROTOCOL || "https";
   const acmeContacts = parseList(env.STALWART_ACME_CONTACT);
   const acmeDomains = parseList(env.STALWART_ACME_DOMAINS);
   const acmeCache = env.STALWART_ACME_CACHE || "%{BASE_PATH}%/etc/acme";
@@ -122,7 +123,7 @@ ${dns01Config}`
 
   const httpConfig = `
 [http]
-url = "https://${hostname}\n"
+url = "${httpProtocol}://${hostname}"
 ${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${httpHeaders.length > 0
       ? `headers = ${JSON.stringify(httpHeaders)}\n`
       : ""

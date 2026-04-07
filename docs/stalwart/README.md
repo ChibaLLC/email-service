@@ -78,7 +78,7 @@ If you are trying to access the web UI from outside Docker, you need one of thes
 
 This setup includes `tmail-web`, a modern and lightweight JMAP-based webmail client from Linagora. It is heavily optimized for full compatibility with Stalwart's natively supported JMAP backend.
 
-By default, this repository configures `tmail-web` to be served on the hostname specified by `STALWART_WEBMAIL_HOSTNAME` (e.g., `https://webmail.example.com`).
+By default, this repository configures `tmail-web` to be served on the hostname specified by `STALWART_WEBMAIL_HOSTNAME` (e.g., `https://webmail.example.com`) over the protocol specified by `STALWART_HTTP_PROTOCOL` (defaults to `https`).
 
 ### CORS Configuration
 
