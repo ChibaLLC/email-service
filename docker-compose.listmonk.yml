@@ -42,6 +42,34 @@ services:
       timeout: 5s
       retries: 10
 
+  listmonk-init:
+    image: alpine:3.20
+    restart: "no"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /config /uploads
+        cat > /config/config.toml <<'EOF'
+        [app]
+        address = "0.0.0.0:${LISTMONK_APP_PORT:-9000}"
+
+        [db]
+        host = "listmonk-db"
+        port = 5432
+        user = "${LISTMONK_DB_USER:-listmonk}"
+        password = "${LISTMONK_DB_PASSWORD:-listmonk}"
+        database = "${LISTMONK_DB_NAME:-listmonk}"
+        ssl_mode = "disable"
+        max_open = 25
+        max_idle = 25
+        max_lifetime = "300s"
+        EOF
+    volumes:
+      - listmonk_config_data:/config
+      - listmonk_uploads_data:/uploads
+
+
 volumes:
   listmonk_db_data:
   listmonk_uploads_data:
