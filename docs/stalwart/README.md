@@ -74,6 +74,14 @@ If you are trying to access the web UI from outside Docker, you need one of thes
 - publish `8080` or `443` from the `stalwart` service to the host
 - route a public hostname to the internal Stalwart web port through your reverse proxy
 
+## Webmail Client (tmail-web)
+
+This setup includes `tmail-web`, a modern and lightweight JMAP-based webmail client from Linagora. It is heavily optimized for full compatibility with Stalwart's natively supported JMAP backend.
+
+```env
+SERVER_URL=https://mail.example.com
+```
+
 ## Using Stalwart With Postal
 
 Stalwart can run in the same deployment as Postal because [docker-compose.prod.yml](../../docker-compose.prod.yml) includes both sets of services.

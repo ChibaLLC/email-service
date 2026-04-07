@@ -35,11 +35,12 @@ Important: the current compose files use `expose` instead of `ports`. That works
 
 ### 3. Access
 
-| URL                                     | Description          |
-| --------------------------------------- | -------------------- |
-| `https://your-app-host`                 | API key registration |
-| `https://your-app-host/dashboard/login` | Dashboard login      |
-| `https://your-app-host/dashboard`       | Monitoring dashboard |
+| URL                                     | Description              |
+| --------------------------------------- | ------------------------ |
+| `https://your-app-host`                 | API key registration     |
+| `https://your-app-host/dashboard/login` | Dashboard login          |
+| `https://your-app-host/dashboard`       | Monitoring dashboard     |
+| `https://webmail.your-mail-hostname`    | JMAP Webmail (tmail-web) |
 
 ## Architecture
 
@@ -229,6 +230,8 @@ Stalwart setup is documented in detail in [docs/stalwart/README.md](docs/stalwar
 
 Stalwart is a full mail stack. The app uses it through the existing nodemailer provider rather than a custom Stalwart API provider.
 It can also run in the same deployment as Postal when you want separate mail roles, for example Postal for transactional traffic and Stalwart for user mailboxes or authenticated SMTP accounts.
+
+Additionally, an integrated JMAP webmail client (`tmail-web`) is bundled in the Stalwart compose overlay, providing a fast and modern interface for checking user mailboxes.
 
 Minimum app configuration:
 

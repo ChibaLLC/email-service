@@ -128,7 +128,7 @@ services:
     labels:
       - traefik.enable=${STALWART_TRAEFIK_ENABLED:-false}
       - traefik.docker.network=${STALWART_TRAEFIK_DOCKER_NETWORK:-${COMPOSE_PROJECT_NAME:-email-service}_default}
-      - "traefik.http.routers.mailserver.rule=Host(`${STALWART_HOSTNAME:-mail.example.com}`) || Host(`${STALWART_AUTODISCOVER_HOSTNAME:-autodiscover.example.com}`) || Host(`${STALWART_AUTOCONFIG_HOSTNAME:-autoconfig.example.com}`) || Host(`${STALWART_MTA_STS_HOSTNAME:-mta-sts.example.com}`)"
+      - "traefik.http.routers.mailserver.rule=Host(`${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}`) || Host(`${STALWART_AUTODISCOVER_HOSTNAME:?STALWART_AUTODISCOVER_HOSTNAME is required}`) || Host(`${STALWART_AUTOCONFIG_HOSTNAME:?STALWART_AUTOCONFIG_HOSTNAME is required}`) || Host(`${STALWART_MTA_STS_HOSTNAME:?STALWART_MTA_STS_HOSTNAME is required}`)"
       - traefik.http.routers.mailserver.entrypoints=${STALWART_TRAEFIK_HTTPS_ENTRYPOINT:-https}
       - traefik.http.routers.mailserver.service=mailserver
       - traefik.http.services.mailserver.loadbalancer.server.port=8080
@@ -166,6 +166,15 @@ services:
       - "4190:4190"
     volumes:
       - stalwart_data:/opt/stalwart
+
+  tmail-web:
+    image: linagora/tmail-web:latest
+    restart: unless-stopped
+    depends_on:
+      stalwart:
+        condition: service_started
+    environment:
+      - SERVER_URL=${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
 
 volumes:
   stalwart_data:

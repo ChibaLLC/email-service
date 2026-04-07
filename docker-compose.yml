@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-email_service}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-email_service_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-email_service}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     expose:
       - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-email_service}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -30,74 +30,6 @@ services:
     expose:
       - "6379"
 
-  listmonk-db:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${LISTMONK_DB_USER:-listmonk}
-      POSTGRES_PASSWORD: ${LISTMONK_DB_PASSWORD:-listmonk}
-      POSTGRES_DB: ${LISTMONK_DB_NAME:-listmonk}
-    expose:
-      - "5432"
-    volumes:
-      - listmonk_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${LISTMONK_DB_USER:-listmonk}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  listmonk-app:
-    image: ${LISTMONK_IMAGE:-listmonk/listmonk:latest}
-    restart: unless-stopped
-    depends_on:
-      listmonk-db:
-        condition: service_healthy
-      listmonk-init:
-        condition: service_completed_successfully
-    command: ["sh", "-c", "./listmonk --install --idempotent --yes --config /config/config.toml && ./listmonk --upgrade --yes --config /config/config.toml && ./listmonk --config /config/config.toml"]
-    environment:
-      TZ: ${LISTMONK_TIMEZONE:-Etc/UTC}
-      LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:-}
-      LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:-}
-    expose:
-      - "9000"  
-    volumes:
-      - listmonk_config_data:/config:ro
-      - listmonk_uploads_data:/listmonk/uploads
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  listmonk-init:
-    image: alpine:3.20
-    restart: "no"
-    command:
-      - /bin/sh
-      - -ec
-      - |
-        mkdir -p /config /uploads
-        cat > /config/config.toml <<'EOF'
-        [app]
-        address = "0.0.0.0:${LISTMONK_APP_PORT:-9000}"
-
-        [db]
-        host = "listmonk-db"
-        port = 5432
-        user = "${LISTMONK_DB_USER:-listmonk}"
-        password = "${LISTMONK_DB_PASSWORD:-listmonk}"
-        database = "${LISTMONK_DB_NAME:-listmonk}"
-        ssl_mode = "disable"
-        max_open = 25
-        max_idle = 25
-        max_lifetime = "300s"
-        EOF
-    volumes:
-      - listmonk_config_data:/config
-      - listmonk_uploads_data:/uploads
-
   app:
     build:
       context: .
@@ -108,7 +40,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-email_service}:${POSTGRES_PASSWORD:-email_service_pass}@postgres:5432/${POSTGRES_DB:-email_service}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
@@ -119,6 +51,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  listmonk_db_data:
-  listmonk_config_data:
-  listmonk_uploads_data:
