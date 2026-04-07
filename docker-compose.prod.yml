@@ -59,6 +59,11 @@
       file: docker-compose.stalwart.yml
       service: stalwart
 
+  tmail-web:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: tmail-web
+
   postal-config:
     extends:
       file: docker-compose.postal.yml
