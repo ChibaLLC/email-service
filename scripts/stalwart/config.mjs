@@ -194,6 +194,10 @@ protocol = "http"
 tls.implicit = true
 ${httpConfig}${proxyConfig}
 
+[oauth.client-registration]
+require = false
+anonymous = true
+
 [storage]
 data = "postgresql"
 blob = "minio"
