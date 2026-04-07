@@ -174,7 +174,10 @@ services:
       stalwart:
         condition: service_started
     environment:
-      - SERVER_URL=${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
+      # Ensure SERVER_URL has the https:// prefix as expected by the frontend
+      - SERVER_URL=https://${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
+    command: >
+      /bin/sh -c "echo SERVER_URL=$$SERVER_URL > /usr/share/nginx/html/assets/env.file && exec nginx -g 'daemon off;'"
 
 volumes:
   stalwart_data:

@@ -82,6 +82,23 @@ This setup includes `tmail-web`, a modern and lightweight JMAP-based webmail cli
 SERVER_URL=https://mail.example.com
 ```
 
+### CORS Configuration
+
+Because `tmail-web` is a client-side application running in your browser, your Stalwart server must explicitly permit cross-origin requests from the domain or IP where you host the webmail client.
+
+By default, this repository configures Stalwart to allow `http://localhost:8080`. If you host `tmail-web` on a different port or a public domain, update this variable in your `.env`:
+
+```bash
+STALWART_HTTP_CORS_ALLOWED_ORIGINS=https://webmail.yourdomain.com
+```
+
+After updating the variable, you must regenerate the Stalwart config and restart the service:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env up -d stalwart-config
+docker compose -f docker-compose.prod.yml --env-file .env restart stalwart
+```
+
 ## Using Stalwart With Postal
 
 Stalwart can run in the same deployment as Postal because [docker-compose.prod.yml](../../docker-compose.prod.yml) includes both sets of services.

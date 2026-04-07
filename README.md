@@ -231,7 +231,8 @@ Stalwart setup is documented in detail in [docs/stalwart/README.md](docs/stalwar
 Stalwart is a full mail stack. The app uses it through the existing nodemailer provider rather than a custom Stalwart API provider.
 It can also run in the same deployment as Postal when you want separate mail roles, for example Postal for transactional traffic and Stalwart for user mailboxes or authenticated SMTP accounts.
 
-Additionally, an integrated JMAP webmail client (`tmail-web`) is bundled in the Stalwart compose overlay, providing a fast and modern interface for checking user mailboxes.
+Additionally, an integrated JMAP webmail client (`tmail-web`) is bundled in the Stalwart compose overlay, providing a fast and modern interface for checking user mailboxes. 
+Note: If you run `tmail-web` on a custom port or domain, you must configure CORS origins in your `.env` via `STALWART_HTTP_CORS_ALLOWED_ORIGINS`.
 
 Minimum app configuration:
 

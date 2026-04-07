@@ -28,6 +28,7 @@ export function buildStalwartConfig(env) {
   const acmeDefault = env.STALWART_ACME_DEFAULT !== "false";
   const proxyTrustedNetworks = parseList(env.STALWART_PROXY_TRUSTED_NETWORKS);
   const httpUseXForwarded = env.STALWART_HTTP_USE_X_FORWARDED === "true";
+  const httpCorsAllowedOrigins = parseList(env.STALWART_HTTP_CORS_ALLOWED_ORIGINS);
   const resolvedAcmeDomains = acmeDomains.length > 0 ? acmeDomains : [hostname];
 
   // DNS-01 provider settings
@@ -110,13 +111,23 @@ renew-before = ${JSON.stringify(acmeRenewBefore)}
 default = ${acmeDefault}
 ${dns01Config}`
     : "";
-  const httpConfig = httpUseXForwarded
-    ? `
 
+  const httpHeaders = [];
+  if (httpCorsAllowedOrigins.length > 0) {
+    // Standard CORS headers for JMAP/Webmail clients
+    httpHeaders.push(`Access-Control-Allow-Origin: ${httpCorsAllowedOrigins[0]}`);
+    httpHeaders.push("Access-Control-Allow-Methods: GET, POST, OPTIONS, DELETE, PUT");
+    httpHeaders.push("Access-Control-Allow-Headers: Content-Type, Authorization, Accept");
+    httpHeaders.push("Access-Control-Allow-Credentials: true");
+  }
+
+  const httpConfig = `
 [http]
-use-x-forwarded = true
-`
-    : "";
+${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${
+    httpHeaders.length > 0
+      ? `headers = ${JSON.stringify(httpHeaders)}\n`
+      : ""
+  }`;
   const proxyConfig =
     proxyTrustedNetworks.length > 0
       ? `
