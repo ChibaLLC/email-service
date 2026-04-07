@@ -174,10 +174,22 @@ services:
       stalwart:
         condition: service_started
     environment:
-      # Ensure SERVER_URL has the https:// prefix as expected by the frontend
-      - SERVER_URL=https://${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
+      - STALWART_HOSTNAME=${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
+      - STALWART_WEBMAIL_HOSTNAME=${STALWART_WEBMAIL_HOSTNAME:?STALWART_WEBMAIL_HOSTNAME is required}
+    ports:
+      - "8080:80"
     command: >
-      /bin/sh -c "echo SERVER_URL=$$SERVER_URL > /usr/share/nginx/html/assets/env.file && exec nginx -g 'daemon off;'"
+      /bin/sh -c "cat <<EOF > /usr/share/nginx/html/assets/env.file
+      SERVER_URL=https://$$STALWART_HOSTNAME
+      DOMAIN_REDIRECT_URL=https://$$STALWART_WEBMAIL_HOSTNAME
+      WEB_OIDC_CLIENT_ID=
+      APP_GRID_AVAILABLE=unsupported
+      FCM_AVAILABLE=supported
+      IOS_FCM=supported
+      PLATFORM=other
+      FORCE_EMAIL_QUERY=false
+      EOF
+      exec nginx -g 'daemon off;'"
 
 volumes:
   stalwart_data:
