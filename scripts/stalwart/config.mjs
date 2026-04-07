@@ -123,7 +123,7 @@ ${dns01Config}`
 
   const httpConfig = `
 [http]
-url = "${httpProtocol}://${hostname}"
+url = "'${httpProtocol}://${hostname}'"
 ${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${httpHeaders.length > 0
       ? `headers = ${JSON.stringify(httpHeaders)}\n`
       : ""
