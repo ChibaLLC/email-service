@@ -43,7 +43,7 @@ export function buildStalwartConfig(env) {
     if (!acmeDnsProvider) {
       throw new Error(
         "STALWART_ACME_CHALLENGE is dns-01 but STALWART_ACME_DNS_PROVIDER is not set. " +
-          "Set it to 'cloudflare' or 'rfc2136-tsig'.",
+        "Set it to 'cloudflare' or 'rfc2136-tsig'.",
       );
     }
     const lines = [];
@@ -62,7 +62,7 @@ export function buildStalwartConfig(env) {
       if (!cfSecret) {
         throw new Error(
           "STALWART_ACME_DNS_PROVIDER is cloudflare but STALWART_ACME_DNS_CF_SECRET is not set. " +
-            "Provide a Cloudflare API token with Zone:DNS:Edit permission.",
+          "Provide a Cloudflare API token with Zone:DNS:Edit permission.",
         );
       }
       lines.push(`secret = ${JSON.stringify(cfSecret)}`);
@@ -87,7 +87,7 @@ export function buildStalwartConfig(env) {
     } else {
       throw new Error(
         `Unsupported STALWART_ACME_DNS_PROVIDER: ${JSON.stringify(acmeDnsProvider)}. ` +
-          "Supported values: cloudflare, rfc2136-tsig.",
+        "Supported values: cloudflare, rfc2136-tsig.",
       );
     }
 
@@ -100,12 +100,11 @@ export function buildStalwartConfig(env) {
 [acme."letsencrypt"]
 directory = ${JSON.stringify(acmeDirectory)}
 challenge = ${JSON.stringify(acmeChallenge)}
-${
-  acmeContacts.length > 0
-    ? `contact = ${JSON.stringify(acmeContacts)}
+${acmeContacts.length > 0
+      ? `contact = ${JSON.stringify(acmeContacts)}
 `
-    : ""
-}domains = ${JSON.stringify(resolvedAcmeDomains)}
+      : ""
+    }domains = ${JSON.stringify(resolvedAcmeDomains)}
 cache = ${JSON.stringify(acmeCache)}
 renew-before = ${JSON.stringify(acmeRenewBefore)}
 default = ${acmeDefault}
@@ -123,11 +122,10 @@ ${dns01Config}`
 
   const httpConfig = `
 [http]
-${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${
-    httpHeaders.length > 0
+${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${httpHeaders.length > 0
       ? `headers = ${JSON.stringify(httpHeaders)}\n`
       : ""
-  }`;
+    }permissive-cors = true`;
   const proxyConfig =
     proxyTrustedNetworks.length > 0
       ? `
