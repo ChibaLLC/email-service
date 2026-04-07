@@ -178,7 +178,7 @@ services:
       - STALWART_WEBMAIL_HOSTNAME=${STALWART_WEBMAIL_HOSTNAME:?STALWART_WEBMAIL_HOSTNAME is required}
     ports:
       - "8080:80"
-    command: >
+    command: |
       /bin/sh -c "cat <<EOF > /usr/share/nginx/html/assets/env.file
       SERVER_URL=https://$$STALWART_HOSTNAME
       DOMAIN_REDIRECT_URL=https://$$STALWART_WEBMAIL_HOSTNAME
