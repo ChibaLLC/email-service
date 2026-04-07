@@ -11,17 +11,17 @@
 
   listmonk-db:
     extends:
-      file: docker-compose.yml
+      file: docker-compose.listmonk.yml
       service: listmonk-db
 
   listmonk-init:
     extends:
-      file: docker-compose.yml
+      file: docker-compose.listmonk.yml
       service: listmonk-init
 
   listmonk-app:
     extends:
-      file: docker-compose.yml
+      file: docker-compose.listmonk.yml
       service: listmonk-app
 
   app:
