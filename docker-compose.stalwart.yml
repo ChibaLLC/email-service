@@ -181,7 +181,7 @@ services:
       /bin/sh -c "cat <<EOF > /usr/share/nginx/html/assets/env.file
       SERVER_URL=$$STALWART_HTTP_PROTOCOL://$$STALWART_HOSTNAME
       DOMAIN_REDIRECT_URL=$$STALWART_HTTP_PROTOCOL://$$STALWART_WEBMAIL_HOSTNAME
-      WEB_OIDC_CLIENT_ID=
+      WEB_OIDC_CLIENT_ID=tmail-web
       APP_GRID_AVAILABLE=unsupported
       FCM_AVAILABLE=supported
       IOS_FCM=supported
