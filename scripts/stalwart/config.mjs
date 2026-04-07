@@ -122,6 +122,7 @@ ${dns01Config}`
 
   const httpConfig = `
 [http]
+url = "https://${hostname}\n"
 ${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${httpHeaders.length > 0
       ? `headers = ${JSON.stringify(httpHeaders)}\n`
       : ""
