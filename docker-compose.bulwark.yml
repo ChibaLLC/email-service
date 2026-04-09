@@ -1,0 +1,116 @@
+# Bulwark Webmail overlay.
+# A modern, self-hosted JMAP webmail client (https://bulwarkmail.org) built
+# for Stalwart Mail Server. Provides email, calendar, contacts, and file
+# management via the JMAP protocol.
+#
+# Requires:
+#   - A running Stalwart (or other JMAP-compatible) mail server
+#   - BULWARK_JMAP_SERVER_URL pointing to the Stalwart internal URL
+#
+# Usage with the prod stack:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# To update the image:
+#   docker compose -f docker-compose.bulwark.yml pull bulwark-web
+
+services:
+  stalwart-db:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-db
+
+  stalwart-redis:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-redis
+
+  stalwart-minio:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-minio
+
+  stalwart-minio-init:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-minio-init
+
+  stalwart-config:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-config
+
+  stalwart:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart
+
+  bulwark-web:
+    image: ${BULWARK_IMAGE:-ghcr.io/bulwarkmail/webmail:latest}
+    restart: unless-stopped
+    depends_on:
+      stalwart:
+        condition: service_started
+    environment:
+      # ── Server ──────────────────────────────────────────────────────────────
+      # Host and port the Next.js server listens on inside the container.
+      - HOSTNAME=${BULWARK_HOSTNAME:-0.0.0.0}
+      - PORT=${BULWARK_PORT:-3000}
+
+      # ── JMAP backend (required) ──────────────────────────────────────────────
+      # Internal Docker URL of Stalwart's HTTP/JMAP endpoint. When Stalwart
+      # runs on port 8080 in the same Compose network, use the service name.
+      - JMAP_SERVER_URL=${BULWARK_JMAP_SERVER_URL:-http://stalwart:8080}
+
+      # Allow users to supply their own JMAP endpoint on the login page.
+      # Useful when you want to support multiple mail servers from one instance.
+      # - ALLOW_CUSTOM_JMAP_ENDPOINT=${BULWARK_ALLOW_CUSTOM_JMAP_ENDPOINT:-false}
+
+      # ── Session security ─────────────────────────────────────────────────────
+      # Secret used to encrypt the AES-256-GCM session cookie (httpOnly, 30-day).
+      # Generate with: openssl rand -base64 32
+      - SESSION_SECRET=${BULWARK_SESSION_SECRET:?BULWARK_SESSION_SECRET is required}
+
+      # ── OAuth 2.0 / OIDC (optional) ──────────────────────────────────────────
+      # Set OAUTH_ENABLED=true to enable OAuth/OIDC login in addition to (or
+      # instead of) password-based login.
+      # Stalwart has a built-in OAuth server; for Keycloak or Authentik set
+      # OAUTH_ISSUER_URL to your provider's discovery endpoint.
+      - OAUTH_ENABLED=${BULWARK_OAUTH_ENABLED:-true}
+      # Client ID registered in the OAuth provider (e.g. stalwart or keycloak).
+      - OAUTH_CLIENT_ID=${BULWARK_OAUTH_CLIENT_ID:-webmail}
+      # Client secret — leave empty for public (PKCE) clients.
+      - OAUTH_CLIENT_SECRET=${BULWARK_OAUTH_CLIENT_SECRET:-}
+      # Optional: external IdP issuer URL for Keycloak / Authentik.
+      # Leave empty to use Stalwart's built-in OAuth server (auto-discovered
+      # from JMAP_SERVER_URL/.well-known/oauth-authorization-server).
+      - OAUTH_ISSUER_URL=${BULWARK_OAUTH_ISSUER_URL:-}
+
+      # ── Branding ─────────────────────────────────────────────────────────────
+      - APP_NAME=${BULWARK_APP_NAME:-Bulwark Webmail}
+      # Logo displayed on the login page (light / dark backgrounds).
+      # Use full URLs (https://…) or paths served from the container's /public.
+      - LOGIN_LOGO_LIGHT_URL=${BULWARK_LOGIN_LOGO_LIGHT_URL:-}
+      - LOGIN_LOGO_DARK_URL=${BULWARK_LOGIN_LOGO_DARK_URL:-}
+      # Company name and website link shown on the login page.
+      - LOGIN_COMPANY_NAME=${BULWARK_LOGIN_COMPANY_NAME:-}
+      - LOGIN_WEBSITE_URL=${BULWARK_LOGIN_WEBSITE_URL:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:${BULWARK_PORT:-3000}/api/health",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  stalwart_data:
+  stalwart_db_data:
+  stalwart_redis_data:
+  stalwart_minio_data:

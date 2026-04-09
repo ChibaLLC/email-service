@@ -1,4 +1,4 @@
-﻿services:
+services:
   postgres:
     extends:
       file: docker-compose.yml
@@ -59,10 +59,20 @@
       file: docker-compose.stalwart.yml
       service: stalwart
 
-  tmail-web:
+  # ── Webmail clients ──────────────────────────────────────────────────────
+  # Bulwark is the default webmail client (web-only, richer features).
+  # See docker-compose.bulwark.yml for full configuration options.
+  bulwark-web:
     extends:
-      file: docker-compose.stalwart.yml
-      service: tmail-web
+      file: docker-compose.bulwark.yml
+      service: bulwark-web
+
+  # Twake Mail (tmail-web) is an alternative webmail client.
+  # To use it instead of Bulwark, uncomment this block (and comment out bulwark-web above).
+  # tmail-web:
+  #   extends:
+  #     file: docker-compose.stalwart.yml
+  #     service: tmail-web
 
   postal-config:
     extends:

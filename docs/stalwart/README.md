@@ -74,28 +74,36 @@ If you are trying to access the web UI from outside Docker, you need one of thes
 - publish `8080` or `443` from the `stalwart` service to the host
 - route a public hostname to the internal Stalwart web port through your reverse proxy
 
-## Webmail Client (tmail-web)
+## Webmail Client
 
-This setup includes `tmail-web`, a modern and lightweight JMAP-based webmail client from Linagora. It is heavily optimized for full compatibility with Stalwart's natively supported JMAP backend.
+This setup includes a JMAP webmail client. **[Bulwark](https://bulwarkmail.org)** is the default — a modern, self-hosted Next.js webmail built for Stalwart. It provides email, calendar, contacts, file management, S/MIME, OAuth2/OIDC, and more.
 
-By default, this repository configures `tmail-web` to be served on the hostname specified by `STALWART_WEBMAIL_HOSTNAME` (e.g., `https://webmail.example.com`) over the protocol specified by `STALWART_HTTP_PROTOCOL` (defaults to `https`).
+Bulwark is configured via `docker-compose.bulwark.yml` and the `BULWARK_*` env vars in [.env.example](../../.env.example). It listens on the hostname specified by `BULWARK_WEBMAIL_HOSTNAME` and talks to Stalwart over the internal Docker network via `BULWARK_JMAP_SERVER_URL` (defaults to `http://stalwart:8080`).
+
+The alternative **Twake Mail (`tmail-web`)** is a lightweight JMAP webmail from Linagora, available in `docker-compose.stalwart.yml`. To switch to it:
+
+1. Comment out `bulwark-web` in `docker-compose.prod.yml`
+2. Uncomment the `tmail-web` block beneath it
+
+`tmail-web` uses `STALWART_WEBMAIL_HOSTNAME` and `STALWART_HTTP_PROTOCOL` from `.env`.
 
 ### CORS Configuration
 
-Because `tmail-web` is a client-side application running in your browser, your Stalwart server must explicitly permit cross-origin requests from the domain or IP where you host the webmail client.
+Because both clients are browser-side applications, Stalwart must allow cross-origin requests from the webmail domain.
 
-By default, this repository configures Stalwart to allow `http://localhost:8080`. If you host `tmail-web` on a different port or a public domain, update this variable in your `.env`:
+By default, this repository configures Stalwart to allow `http://localhost:8080`. If you host the webmail on a different port or public domain, update this variable in your `.env`:
 
 ```bash
 STALWART_HTTP_CORS_ALLOWED_ORIGINS=https://webmail.yourdomain.com
 ```
 
-After updating the variable, you must regenerate the Stalwart config and restart the service:
+After updating the variable, regenerate the Stalwart config and restart:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env up -d stalwart-config
 docker compose -f docker-compose.prod.yml --env-file .env restart stalwart
 ```
+
 
 ## Using Stalwart With Postal
 

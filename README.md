@@ -40,7 +40,7 @@ Important: the current compose files use `expose` instead of `ports`. That works
 | `https://your-app-host`                 | API key registration     |
 | `https://your-app-host/dashboard/login` | Dashboard login          |
 | `https://your-app-host/dashboard`       | Monitoring dashboard     |
-| `https://webmail.your-mail-hostname`    | JMAP Webmail (tmail-web) |
+| `https://webmail.your-mail-hostname`    | JMAP Webmail (Bulwark)   |
 
 ## Architecture
 
@@ -231,11 +231,12 @@ Stalwart setup is documented in detail in [docs/stalwart/README.md](docs/stalwar
 Stalwart is a full mail stack. The app uses it through the existing nodemailer provider rather than a custom Stalwart API provider.
 It can also run in the same deployment as Postal when you want separate mail roles, for example Postal for transactional traffic and Stalwart for user mailboxes or authenticated SMTP accounts.
 
-Additionally, an integrated JMAP webmail client (`tmail-web`) is bundled in the Stalwart compose overlay, providing a fast and modern interface for checking user mailboxes. 
-By default, this repository configures `tmail-web` to be served on the hostname specified by `STALWART_WEBMAIL_HOSTNAME` (e.g., `https://webmail.example.com`) and defaults to the `https` protocol via `STALWART_HTTP_PROTOCOL`.
+Additionally, an integrated JMAP webmail client is bundled in the Stalwart compose overlay. **[Bulwark](https://bulwarkmail.org)** is the default — a modern, feature-rich Next.js webmail supporting email, calendar, contacts, files, OAuth2/OIDC, and more. It is served via `docker-compose.bulwark.yml` and configured through `BULWARK_*` env vars.
+
+The alternative **Twake Mail (`tmail-web`)** is also available in the Stalwart compose overlay. To switch to it, comment out `bulwark-web` in `docker-compose.prod.yml` and uncomment `tmail-web`. See [docs/stalwart/README.md](docs/stalwart/README.md) for details.
 
 ### CORS Configuration
-If you run `tmail-web` on a custom port or domain, you must configure CORS origins in your `.env` via `STALWART_HTTP_CORS_ALLOWED_ORIGINS`.
+If you run the webmail client on a custom port or domain, you must configure CORS origins in your `.env` via `STALWART_HTTP_CORS_ALLOWED_ORIGINS`.
 
 Minimum app configuration:
 
