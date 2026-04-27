@@ -15,8 +15,8 @@ services:
       LIBREDESK_DB__PASSWORD: ${LIBREDESK_DB__PASSWORD:-bikbokbuy}
       LIBREDESK_DB__DATABASE: ${LIBREDESK_POSTGRES_DB:-master}
     depends_on:
-      - db
-      - redis
+      - libredesk-db
+      - libredesk-redis
     volumes:
       - libredesk-uploads:/libredesk/uploads:rw
       - ./configs/libre-desk.toml:/libredesk/config.toml
@@ -30,7 +30,7 @@ services:
       ]
 
   # PostgreSQL database
-  db:
+  libredesk-db:
     image: postgres:17-alpine
     restart: unless-stopped
     expose:
@@ -54,7 +54,7 @@ services:
       - libredesk-postgres-data:/var/lib/postgresql/data
 
   # Redis
-  redis:
+  libredesk-redis:
     image: redis:7-alpine
     restart: unless-stopped
     expose:
