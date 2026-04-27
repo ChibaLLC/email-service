@@ -107,12 +107,12 @@ services:
   libredesk-redis:
     extends:
       file: docker-compose.libredesk.yml
-      service: redis
+      service: libredesk-redis
   
   libredesk-db:
     extends:
         file: docker-compose.libredesk.yml
-        service: db
+        service: libredesk-db
   
   libredesk-app:
     extends:
