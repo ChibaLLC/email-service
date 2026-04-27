@@ -104,6 +104,27 @@ services:
       file: docker-compose.postal.yml
       service: postal-smtp
 
+  libredesk-redis:
+    extends:
+      file: docker-compose.libredesk.yml
+      service: redis
+  
+  libredesk-db:
+    extends:
+        file: docker-compose.libredesk.yml
+        service: db
+  
+  libredesk-app:
+    extends:
+      file: docker-compose.libredesk.yml
+      service: libredesk
+    environment:
+      - LIBREDESK_DB__HOST=${LIBREDESK_DB__HOST:-libredesk-db}
+      - LIBREDESK_REDIS__ADDRESS=${LIBREDESK_REDIS__ADDRESS:-libredesk-redis:6379}
+    depends_on:
+      - libredesk-db
+      - libredesk-redis
+
 volumes:
   postgres_data:
   redis_data:
@@ -116,3 +137,6 @@ volumes:
   stalwart_minio_data:
   postal_db_data:
   postal_config_data:
+  libredesk-postgres-data:
+  libredesk-redis-data:
+  libredesk-uploads:

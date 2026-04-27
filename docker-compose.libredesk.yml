@@ -1,0 +1,68 @@
+services:
+  libredesk:
+    image: libredesk/libredesk:latest
+    restart: unless-stopped
+    expose:
+      - 9000
+    environment:
+      # If the password is set during first docker-compose up, the system user password will be set to this value.
+      # You can always set system user password later by running `docker exec -it libredesk_app ./libredesk --set-system-user-password`.
+      LIBREDESK_SYSTEM_USER_PASSWORD: ${LIBREDESK_SYSTEM_USER_PASSWORD:?Need LIBREDESK_SYSTEM_USER_PASSWORD}
+      LIBREDESK_APP__ENCRYPTION_KEY: ${LIBREDESK_APP__ENCRYPTION_KEY:?Need LIBREDESK_APP__ENCRYPTION_KEY}
+      LIBREDESK_DB__HOST: ${LIBREDESK_DB__HOST:-db}
+      LIBREDESK_DB__PORT: ${LIBREDESK_DB__PORT}
+      LIBREDESK_DB__USER: ${LIBREDESK_POSTGRES_USER:-master}
+      LIBREDESK_DB__PASSWORD: ${LIBREDESK_DB__PASSWORD:-bikbokbuy}
+      LIBREDESK_DB__DATABASE: ${LIBREDESK_POSTGRES_DB:-master}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - libredesk-uploads:/libredesk/uploads:rw
+      - ./configs/libre-desk.toml:/libredesk/config.toml
+    command:
+      [
+        sh,
+        -c,
+        "./libredesk --install --idempotent-install --yes --config
+          /libredesk/config.toml && ./libredesk --upgrade --yes --config
+          /libredesk/config.toml && ./libredesk --config /libredesk/config.toml",
+      ]
+
+  # PostgreSQL database
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    expose:
+      - 5432
+    environment:
+      # Set these environment variables to configure the database, defaults to libredesk.
+      POSTGRES_USER: ${LIBREDESK_POSTGRES_USER:-master}
+      POSTGRES_PASSWORD: ${LIBREDESK_DB__PASSWORD:-bikbokbuy}
+      POSTGRES_DB: ${LIBREDESK_POSTGRES_DB:-master}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-libredesk} -d
+            ${POSTGRES_DB:-libredesk}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - libredesk-postgres-data:/var/lib/postgresql/data
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    expose:
+      - 6379
+    volumes:
+      - libredesk-redis-data:/data
+
+volumes:
+  libredesk-postgres-data:
+  libredesk-redis-data:
+  libredesk-uploads:
