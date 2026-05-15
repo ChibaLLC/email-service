@@ -104,6 +104,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d stalwart-config
 docker compose -f docker-compose.prod.yml --env-file .env restart stalwart
 ```
 
+> **TODO**: Investigate why the new way of generating configs may not work.
 
 ## Using Stalwart With Postal
 
