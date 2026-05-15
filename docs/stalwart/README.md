@@ -6,7 +6,7 @@ This guide covers the Stalwart-specific setup for this repo: running the product
 
 - A production Stalwart compose definition in [docker-compose.stalwart.yml](../../docker-compose.stalwart.yml)
 - A consolidated production compose file in [docker-compose.prod.yml](../../docker-compose.prod.yml) that includes the base app services plus Stalwart, Postal, and Listmonk
-- A Stalwart config generator in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) and [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs)
+- A Stalwart artifact generator in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) and [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs)
 - A helper cleanup script in [scripts/stalwart/free-ports.sh](../../scripts/stalwart/free-ports.sh) for freeing the standard Stalwart mail ports on a server before startup
 - App integration through the existing nodemailer provider in [server/email/providers/nodemailer.ts](../../server/email/providers/nodemailer.ts)
 
@@ -27,7 +27,7 @@ This starts the full production stack, including:
 - dedicated PostgreSQL for Stalwart metadata and internal directory state
 - dedicated Redis for lookup and in-memory state
 - dedicated MinIO for blob/object storage
-- one-shot init services that create the MinIO bucket and write the Stalwart `config.toml`
+- one-shot init services that create the MinIO bucket and write Stalwart `config.json`, `bootstrap.json`, and `apply-plan.ndjson`
 
 The Stalwart services publish the standard mail ports directly on the host: `25`, `587`, `465`, `143`, `993`, `110`, `995`, and `4190`.
 
@@ -56,7 +56,7 @@ That script stops common Linux mail services, stops Docker containers already pu
 
 ## First Login
 
-This repo now configures a deterministic fallback admin user in the generated Stalwart config.
+This repo configures deterministic recovery admin credentials through `STALWART_RECOVERY_ADMIN` on the Stalwart container.
 
 Set these values in `.env` before first startup:
 
@@ -120,7 +120,13 @@ Important for inbound delivery: if Stalwart should receive mail for a domain, do
 
 ## Configure Stalwart In Production
 
-The production overlay writes a `config.toml` that preselects these backends from first boot:
+The production overlay writes current Stalwart startup artifacts under `/etc/stalwart`:
+
+- `config.json`: PostgreSQL datastore pointer used by `stalwart --config /etc/stalwart/config.json`
+- `bootstrap.json`: first-boot setup data for hostname, default domain, stores, directory, and DKIM generation
+- `apply-plan.ndjson`: declarative operations for listeners, HTTP settings, hostname, and optional ACME provider setup
+
+Those artifacts preselect these backends from first boot:
 
 - data store: PostgreSQL
 - search store: PostgreSQL
@@ -145,6 +151,7 @@ Stalwart generates its own recommended DNS records per configured domain, includ
 Important production env keys in [.env.example](../../.env.example):
 
 - `STALWART_HOSTNAME`
+- `STALWART_PUBLIC_URL`
 - `STALWART_AUTODISCOVER_HOSTNAME`
 - `STALWART_AUTOCONFIG_HOSTNAME`
 - `STALWART_MTA_STS_HOSTNAME`
@@ -193,11 +200,11 @@ Important production env keys in [.env.example](../../.env.example):
 
 ## Automatic TLS With ACME
 
-The generated Stalwart config can emit an optional Let's Encrypt ACME section. Without ACME or an explicit certificate, Stalwart falls back to a self-signed certificate — remote servers will reject STARTTLS with `UnknownIssuer`.
+The generated Stalwart apply plan can request a Let's Encrypt ACME provider. Without ACME or an explicit certificate, Stalwart falls back to a self-signed certificate, and remote servers may reject STARTTLS with `UnknownIssuer`.
 
 ### Challenge Types
 
-Stalwart supports three ACME challenge types:
+Stalwart supports multiple ACME challenge types:
 
 | Challenge | Requires | Supports Wildcards | Best For |
 |-----------|----------|-------------------|----------|
@@ -205,7 +212,7 @@ Stalwart supports three ACME challenge types:
 | `http-01` | Port 80 reachable by Let's Encrypt | No | Servers with port 80 available |
 | `dns-01` | DNS provider API credentials | Yes | Behind a reverse proxy (Traefik, Caddy, etc.) |
 
-**`dns-01` is recommended** when Stalwart runs behind a reverse proxy like Traefik or Dokploy, because no specific ports need to be open for the ACME challenge.
+**`dns-01` is recommended** when Stalwart runs behind a reverse proxy like Traefik or Dokploy, because no specific ports need to be open for the ACME challenge. The current generator validates that a DNS provider is selected for `dns-01`; provider-specific apply-plan fields may need adjustment if Stalwart changes its management API schema.
 
 ### DNS-01 with Cloudflare
 
@@ -263,7 +270,7 @@ STALWART_ACME_DNS_RFC_SECRET=base64-encoded-tsig-secret
 
 ### TLS-ALPN-01 (direct exposure)
 
-> **TODO**: The config generator fully supports `dns-01` with Cloudflare and RFC2136. Support for `tls-alpn-01` and `http-01` works at the basic ACME level (directory, challenge, contact, domains), but the generator does not yet handle their specific deployment needs — publishing port 443 or 80, or compose overrides for direct exposure. Extend the generator and compose when these challenge types are needed.
+> **TODO**: The artifact generator handles the common ACME provider fields used by this stack. Challenge-specific deployment details still need matching infrastructure: DNS credentials for `dns-01`, port `443` for `tls-alpn-01`, or port `80` for `http-01`. Extend the generator and compose when those details need to be managed entirely by this repo.
 
 Use this only when Stalwart can receive connections on port 443 directly:
 
@@ -291,7 +298,7 @@ STALWART_ACME_DNS_ORIGIN=example.com     # DNS zone origin (auto-detected if omi
 
 ## Reverse Proxy Examples
 
-The generated `config.toml` comes from [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) through [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs). That script is what defines the internal Stalwart listeners your reverse proxy targets: SMTP on `25`, submission on `587`, SMTPS on `465`, IMAPS on `993`, HTTP on `8080`, and HTTPS or JMAP on `443`.
+The generated `/etc/stalwart` artifacts come from [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) through [scripts/stalwart/init.mjs](../../scripts/stalwart/init.mjs). That script is what defines the internal Stalwart listeners your reverse proxy targets: SMTP on `25`, submission on `587`, SMTPS on `465`, IMAPS on `993`, HTTP on `8080`, and HTTPS or JMAP on `443`.
 
 That same generator now also supports reverse-proxy-aware settings:
 
@@ -300,7 +307,7 @@ That same generator now also supports reverse-proxy-aware settings:
 
 To avoid looking up the proxy subnet manually, this repo also includes [scripts/stalwart/proxy-network.mjs](../../scripts/stalwart/proxy-network.mjs). It inspects the Docker network used by Traefik and prints the value for `STALWART_PROXY_TRUSTED_NETWORKS`.
 
-If you prefer to resolve this automatically during Stalwart config generation, set `STALWART_PROXY_AUTODETECT=true`. The one-shot `stalwart-config` container will inspect the Docker API through `/var/run/docker.sock` and populate `STALWART_PROXY_TRUSTED_NETWORKS` before [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) writes `config.toml`.
+If you prefer to resolve this automatically during Stalwart config generation, set `STALWART_PROXY_AUTODETECT=true`. The one-shot `stalwart-config` container will inspect the Docker API through `/var/run/docker.sock` and populate `STALWART_PROXY_TRUSTED_NETWORKS` before [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) writes the `/etc/stalwart` artifacts.
 
 When `STALWART_TRAEFIK_DOCKER_NETWORK` is set, autodetect uses that exact network. When it is not set, autodetect falls back to the Docker networks attached to the `stalwart-config` container itself, which is more reliable in deployment platforms that rename Compose projects or networks.
 
@@ -466,7 +473,7 @@ Operational notes:
 1. If Traefik, Caddy, or NGINX owns host ports `25`, `443`, `465`, or `993`, do not also publish those same host ports directly from the `stalwart` container in that deployment. Use a compose override or deployment-specific compose file to avoid port conflicts.
 2. For project-based Compose deployments with Traefik, the default network label becomes `${COMPOSE_PROJECT_NAME}_default`. If Traefik uses a different shared network, override it with `STALWART_TRAEFIK_DOCKER_NETWORK`.
 3. For Traefik, Caddy, or NGINX TCP forwarding with Proxy Protocol enabled, set `STALWART_PROXY_TRUSTED_NETWORKS` to the proxy container IPs or CIDRs. Without that, Stalwart will not have the right client connection metadata.
-4. For HTTP reverse proxying of the web UI, set `STALWART_HTTP_USE_X_FORWARDED=true` so the generated config in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) trusts forwarded scheme and address headers.
+4. For HTTP reverse proxying of the web UI, set `STALWART_HTTP_USE_X_FORWARDED=true` so the generated artifacts in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) trust forwarded scheme and address headers.
 5. For Traefik TCP passthrough on `443`, `465`, and `993`, Stalwart still needs a valid certificate source. That means ACME in [scripts/stalwart/config.mjs](../../scripts/stalwart/config.mjs) or explicit certificate settings added to that generator.
 6. Caddy needs layer 4 support for raw mail protocols. Without `caddy-l4` or another L4-capable proxy in front, it can only cover the web UI.
 

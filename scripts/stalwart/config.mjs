@@ -1,3 +1,12 @@
+function envValue(env, name, defaultValue = "") {
+  const value = env[name];
+  return value === undefined || value === "" ? defaultValue : value;
+}
+
+function envBoolean(env, name, defaultValue = false) {
+  return ["1", "true", "yes", "on"].includes(envValue(env, name, defaultValue ? "true" : "false").toLowerCase());
+}
+
 function parseList(value) {
   return (value || "")
     .split(",")
@@ -5,240 +14,151 @@ function parseList(value) {
     .filter(Boolean);
 }
 
-export function buildStalwartConfig(env) {
-  const dbName = env.STALWART_DB_NAME || "stalwart";
-  const dbUser = env.STALWART_DB_USER || "stalwart";
-  const dbPassword = env.STALWART_DB_PASSWORD || "stalwart";
-  const redisPassword = env.STALWART_REDIS_PASSWORD || "stalwart";
-  const minioBucket = env.STALWART_MINIO_BUCKET || "stalwart";
-  const minioRegion = env.STALWART_MINIO_REGION || "us-east-1";
-  const minioUser = env.STALWART_MINIO_ROOT_USER || "stalwart";
-  const minioPassword = env.STALWART_MINIO_ROOT_PASSWORD || "stalwart-minio";
-  const minioEndpoint = env.STALWART_MINIO_ENDPOINT || "http://stalwart-minio:9000";
-  const hostname = env.STALWART_HOSTNAME || "mail.example.com";
-  const adminUser = env.STALWART_ADMIN_USER || "admin";
-  const adminPassword = env.STALWART_ADMIN_PASSWORD || "change-me-stalwart-admin";
-  const acmeEnabled = env.STALWART_ACME_ENABLED === "true";
-  const acmeDirectory = env.STALWART_ACME_DIRECTORY || "https://acme-v02.api.letsencrypt.org/directory";
-  const acmeChallenge = env.STALWART_ACME_CHALLENGE || "tls-alpn-01";
-  const httpProtocol = env.STALWART_HTTP_PROTOCOL || "https";
-  const acmeContacts = parseList(env.STALWART_ACME_CONTACT);
-  const acmeDomains = parseList(env.STALWART_ACME_DOMAINS);
-  const acmeCache = env.STALWART_ACME_CACHE || "%{BASE_PATH}%/etc/acme";
-  const acmeRenewBefore = env.STALWART_ACME_RENEW_BEFORE || "30d";
-  const acmeDefault = env.STALWART_ACME_DEFAULT !== "false";
-  const proxyTrustedNetworks = parseList(env.STALWART_PROXY_TRUSTED_NETWORKS);
-  const httpUseXForwarded = env.STALWART_HTTP_USE_X_FORWARDED === "true";
-  const httpCorsAllowedOrigins = parseList(env.STALWART_HTTP_CORS_ALLOWED_ORIGINS);
-  const resolvedAcmeDomains = acmeDomains.length > 0 ? acmeDomains : [hostname];
+function secretEnv(name) {
+  return { "@type": "EnvironmentVariable", variableName: name };
+}
 
-  // DNS-01 provider settings
-  const acmeDnsProvider = env.STALWART_ACME_DNS_PROVIDER || "";
-  const acmeDnsPollingInterval = env.STALWART_ACME_DNS_POLLING_INTERVAL || "15s";
-  const acmeDnsPropagationTimeout = env.STALWART_ACME_DNS_PROPAGATION_TIMEOUT || "1m";
-  const acmeDnsTtl = env.STALWART_ACME_DNS_TTL || "5m";
-  const acmeDnsOrigin = env.STALWART_ACME_DNS_ORIGIN || "";
+function defaultDomain(hostname) {
+  const [, domain] = hostname.split(/\.(.+)/);
+  return domain || hostname;
+}
 
-  let dns01Config = "";
-  if (acmeEnabled && acmeChallenge === "dns-01") {
-    if (!acmeDnsProvider) {
-      throw new Error(
-        "STALWART_ACME_CHALLENGE is dns-01 but STALWART_ACME_DNS_PROVIDER is not set. " +
+function buildDatastore(env) {
+  return {
+    "@type": "PostgreSql",
+    host: "stalwart-db",
+    port: 5432,
+    database: envValue(env, "STALWART_DB_NAME", "stalwart"),
+    authUsername: envValue(env, "STALWART_DB_USER", "stalwart"),
+    authSecret: secretEnv("STALWART_DB_PASSWORD"),
+    poolMaxConnections: 10,
+  };
+}
+
+function buildBootstrap(env) {
+  const hostname = envValue(env, "STALWART_HOSTNAME", "mail.example.com");
+  return {
+    serverHostname: hostname,
+    defaultDomain: envValue(env, "STALWART_DEFAULT_DOMAIN", defaultDomain(hostname)),
+    requestTlsCertificate: envBoolean(env, "STALWART_ACME_ENABLED", false),
+    generateDkimKeys: true,
+    dataStore: buildDatastore(env),
+    blobStore: {
+      "@type": "S3Compatible",
+      bucket: envValue(env, "STALWART_MINIO_BUCKET", "stalwart"),
+      region: envValue(env, "STALWART_MINIO_REGION", "us-east-1"),
+      accessKey: envValue(env, "STALWART_MINIO_ROOT_USER", "stalwart"),
+      secretKey: secretEnv("STALWART_MINIO_ROOT_PASSWORD"),
+      endpoint: envValue(env, "STALWART_MINIO_ENDPOINT", "http://stalwart-minio:9000"),
+      keyPrefix: "stalwart/",
+    },
+    searchStore: { "@type": "Default" },
+    inMemoryStore: {
+      "@type": "Redis",
+      urls: [`redis://:${envValue(env, "STALWART_REDIS_PASSWORD", "stalwart")}@stalwart-redis:6379/0`],
+    },
+    directory: { "@type": "Internal" },
+    dnsServer: { "@type": "Manual" },
+  };
+}
+
+function buildListener(env, name, bind, protocol, useImplicitTls = false) {
+  const listener = { name, bind: [bind], protocol };
+  const trustedNetworks = parseList(env.STALWART_PROXY_TRUSTED_NETWORKS);
+
+  if (trustedNetworks.length > 0 && ["smtp", "submissions", "imaptls", "https"].includes(name)) {
+    listener.overrideProxyTrustedNetworks = trustedNetworks;
+  }
+
+  if (useImplicitTls) {
+    listener.useImplicitTls = true;
+  }
+
+  return listener;
+}
+
+function buildAcmeProvider(env, hostname) {
+  const challenge = envValue(env, "STALWART_ACME_CHALLENGE", "tls-alpn-01");
+  const challengeTypes = {
+    "tls-alpn-01": "TlsAlpn01",
+    "http-01": "Http01",
+    "dns-01": "Dns01",
+  };
+
+  if (challenge === "dns-01" && !envValue(env, "STALWART_ACME_DNS_PROVIDER")) {
+    throw new Error(
+      "STALWART_ACME_CHALLENGE is dns-01 but STALWART_ACME_DNS_PROVIDER is not set. " +
         "Set it to 'cloudflare' or 'rfc2136-tsig'.",
-      );
-    }
-    const lines = [];
-    lines.push(`provider = ${JSON.stringify(acmeDnsProvider)}`);
-    lines.push(`polling-interval = ${JSON.stringify(acmeDnsPollingInterval)}`);
-    lines.push(`propagation-timeout = ${JSON.stringify(acmeDnsPropagationTimeout)}`);
-    lines.push(`ttl = ${JSON.stringify(acmeDnsTtl)}`);
-    if (acmeDnsOrigin) {
-      lines.push(`origin = ${JSON.stringify(acmeDnsOrigin)}`);
-    }
-
-    if (acmeDnsProvider === "cloudflare") {
-      const cfSecret = env.STALWART_ACME_DNS_CF_SECRET || "";
-      const cfEmail = env.STALWART_ACME_DNS_CF_EMAIL || "";
-      const cfTimeout = env.STALWART_ACME_DNS_CF_TIMEOUT || "30s";
-      if (!cfSecret) {
-        throw new Error(
-          "STALWART_ACME_DNS_PROVIDER is cloudflare but STALWART_ACME_DNS_CF_SECRET is not set. " +
-          "Provide a Cloudflare API token with Zone:DNS:Edit permission.",
-        );
-      }
-      lines.push(`secret = ${JSON.stringify(cfSecret)}`);
-      if (cfEmail) lines.push(`email = ${JSON.stringify(cfEmail)}`);
-      lines.push(`timeout = ${JSON.stringify(cfTimeout)}`);
-    } else if (acmeDnsProvider === "rfc2136-tsig") {
-      const rfcHost = env.STALWART_ACME_DNS_RFC_HOST || "";
-      const rfcPort = env.STALWART_ACME_DNS_RFC_PORT || "53";
-      const rfcProtocol = env.STALWART_ACME_DNS_RFC_PROTOCOL || "udp";
-      const rfcAlgorithm = env.STALWART_ACME_DNS_RFC_ALGORITHM || "hmac-sha256";
-      const rfcKey = env.STALWART_ACME_DNS_RFC_KEY || "";
-      const rfcSecret = env.STALWART_ACME_DNS_RFC_SECRET || "";
-      if (!rfcHost) {
-        throw new Error("STALWART_ACME_DNS_PROVIDER is rfc2136-tsig but STALWART_ACME_DNS_RFC_HOST is not set.");
-      }
-      lines.push(`host = ${JSON.stringify(rfcHost)}`);
-      lines.push(`port = ${parseInt(rfcPort, 10)}`);
-      lines.push(`protocol = ${JSON.stringify(rfcProtocol)}`);
-      lines.push(`tsig-algorithm = ${JSON.stringify(rfcAlgorithm)}`);
-      if (rfcKey) lines.push(`key = ${JSON.stringify(rfcKey)}`);
-      if (rfcSecret) lines.push(`secret = ${JSON.stringify(rfcSecret)}`);
-    } else {
-      throw new Error(
-        `Unsupported STALWART_ACME_DNS_PROVIDER: ${JSON.stringify(acmeDnsProvider)}. ` +
-        "Supported values: cloudflare, rfc2136-tsig.",
-      );
-    }
-
-    dns01Config = "\n" + lines.join("\n") + "\n";
+    );
   }
 
-  const acmeConfig = acmeEnabled
-    ? `
+  return {
+    directory: envValue(env, "STALWART_ACME_DIRECTORY", "https://acme-v02.api.letsencrypt.org/directory"),
+    challengeType: challengeTypes[challenge] || challenge,
+    contact: parseList(env.STALWART_ACME_CONTACT).length > 0
+      ? parseList(env.STALWART_ACME_CONTACT)
+      : [`postmaster@${defaultDomain(hostname)}`],
+    domains: parseList(env.STALWART_ACME_DOMAINS).length > 0 ? parseList(env.STALWART_ACME_DOMAINS) : [hostname],
+    renewBefore: envValue(env, "STALWART_ACME_RENEW_BEFORE", "30d"),
+    default: envBoolean(env, "STALWART_ACME_DEFAULT", true),
+  };
+}
 
-[acme."letsencrypt"]
-directory = ${JSON.stringify(acmeDirectory)}
-challenge = ${JSON.stringify(acmeChallenge)}
-${acmeContacts.length > 0
-      ? `contact = ${JSON.stringify(acmeContacts)}
-`
-      : ""
-    }domains = ${JSON.stringify(resolvedAcmeDomains)}
-cache = ${JSON.stringify(acmeCache)}
-renew-before = ${JSON.stringify(acmeRenewBefore)}
-default = ${acmeDefault}
-${dns01Config}`
-    : "";
+function buildApplyPlan(env) {
+  const hostname = envValue(env, "STALWART_HOSTNAME", "mail.example.com");
+  const corsOrigins = parseList(env.STALWART_HTTP_CORS_ALLOWED_ORIGINS);
+  const responseHeaders = corsOrigins.length > 0
+    ? {
+        "Access-Control-Allow-Origin": corsOrigins[0],
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE, PUT",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
+        "Access-Control-Allow-Credentials": "true",
+      }
+    : {};
 
-  const httpHeaders = [];
-  if (httpCorsAllowedOrigins.length > 0) {
-    // Standard CORS headers for JMAP/Webmail clients
-    httpHeaders.push(`Access-Control-Allow-Origin: ${httpCorsAllowedOrigins[0]}`);
-    httpHeaders.push("Access-Control-Allow-Methods: GET, POST, OPTIONS, DELETE, PUT");
-    httpHeaders.push("Access-Control-Allow-Headers: Content-Type, Authorization, Accept");
-    httpHeaders.push("Access-Control-Allow-Credentials: true");
+  const listeners = {
+    smtp: buildListener(env, "smtp", "[::]:25", "smtp"),
+    submission: buildListener(env, "submission", "[::]:587", "smtp"),
+    submissions: buildListener(env, "submissions", "[::]:465", "smtp", true),
+    imap: buildListener(env, "imap", "[::]:143", "imap"),
+    imaptls: buildListener(env, "imaptls", "[::]:993", "imap", true),
+    pop3: buildListener(env, "pop3", "[::]:110", "pop3"),
+    pop3s: buildListener(env, "pop3s", "[::]:995", "pop3", true),
+    sieve: buildListener(env, "sieve", "[::]:4190", "managesieve"),
+    http: buildListener(env, "http", "[::]:8080", "http"),
+    https: buildListener(env, "https", "[::]:443", "http", true),
+  };
+
+  const plan = [
+    { "@type": "update", object: "Bootstrap", value: buildBootstrap(env) },
+    { "@type": "destroy", object: "NetworkListener" },
+    { "@type": "create", object: "NetworkListener", value: listeners },
+    {
+      "@type": "update",
+      object: "Http",
+      value: {
+        usePermissiveCors: true,
+        useXForwarded: envBoolean(env, "STALWART_HTTP_USE_X_FORWARDED", false),
+        responseHeaders,
+      },
+    },
+    { "@type": "update", object: "SystemSettings", value: { defaultHostname: hostname } },
+  ];
+
+  if (envBoolean(env, "STALWART_ACME_ENABLED", false)) {
+    plan.push(
+      { "@type": "destroy", object: "AcmeProvider" },
+      { "@type": "create", object: "AcmeProvider", value: { letsencrypt: buildAcmeProvider(env, hostname) } },
+    );
   }
 
-  const httpConfig = `
-[http]
-url = "'${httpProtocol}://${hostname}'"
-${httpUseXForwarded ? "use-x-forwarded = true\n" : ""}${httpHeaders.length > 0
-      ? `headers = ${JSON.stringify(httpHeaders)}\n`
-      : ""
-    }permissive-cors = true`;
-  const proxyConfig =
-    proxyTrustedNetworks.length > 0
-      ? `
+  return plan;
+}
 
-[server.listener."smtp".proxy]
-trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
-
-[server.listener."submissions".proxy]
-trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
-
-[server.listener."imaptls".proxy]
-trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
-
-[server.listener."https".proxy]
-trusted-networks = ${JSON.stringify(proxyTrustedNetworks)}
-`
-      : "";
-
-  return `[server]
-hostname = "${hostname}"
-
-[server.listener."smtp"]
-bind = ["[::]:25"]
-protocol = "smtp"
-
-[server.listener."submission"]
-bind = ["[::]:587"]
-protocol = "smtp"
-
-[server.listener."submissions"]
-bind = ["[::]:465"]
-protocol = "smtp"
-tls.implicit = true
-
-[server.listener."imap"]
-bind = ["[::]:143"]
-protocol = "imap"
-
-[server.listener."imaptls"]
-bind = ["[::]:993"]
-protocol = "imap"
-tls.implicit = true
-
-[server.listener."pop3"]
-bind = ["[::]:110"]
-protocol = "pop3"
-
-[server.listener."pop3s"]
-bind = ["[::]:995"]
-protocol = "pop3"
-tls.implicit = true
-
-[server.listener."sieve"]
-bind = ["[::]:4190"]
-protocol = "managesieve"
-
-[server.listener."http"]
-bind = ["[::]:8080"]
-protocol = "http"
-
-[server.listener."https"]
-bind = ["[::]:443"]
-protocol = "http"
-tls.implicit = true
-${httpConfig}${proxyConfig}
-
-[oauth.client-registration]
-require = false
-anonymous = true
-
-[storage]
-data = "postgresql"
-blob = "minio"
-fts = "postgresql"
-lookup = "redis"
-directory = "internal"
-
-[store."postgresql"]
-type = "postgresql"
-host = "stalwart-db"
-port = 5432
-database = "${dbName}"
-user = "${dbUser}"
-password = "${dbPassword}"
-timeout = "15s"
-
-[store."postgresql".pool]
-max-connections = 10
-
-[store."minio"]
-type = "s3"
-bucket = "${minioBucket}"
-region = "${minioRegion}"
-access-key = "${minioUser}"
-secret-key = "${minioPassword}"
-endpoint = "${minioEndpoint}"
-timeout = "30s"
-key-prefix = "stalwart/"
-
-[store."redis"]
-type = "redis"
-redis-type = "single"
-urls = "redis://:${redisPassword}@stalwart-redis:6379/0"
-timeout = "10s"
-
-[directory."internal"]
-type = "internal"
-store = "postgresql"
-
-[authentication.fallback-admin]
-user = "${adminUser}"
-secret = "${adminPassword}"
-${acmeConfig}`;
+export function buildStalwartArtifacts(env) {
+  return {
+    config: buildDatastore(env),
+    bootstrap: buildBootstrap(env),
+    applyPlan: buildApplyPlan(env),
+  };
 }

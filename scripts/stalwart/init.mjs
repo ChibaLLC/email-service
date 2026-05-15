@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { buildStalwartConfig } from "./config.mjs";
+import { buildStalwartArtifacts } from "./config.mjs";
 import { inspectContainerNetworksViaSocket, inspectNetworkViaSocket, resolveNetworkName } from "./proxy-network.mjs";
 
-const configPath = process.env.STALWART_CONFIG_PATH || "/opt/stalwart/etc/config.toml";
-const configDir = configPath.slice(0, configPath.lastIndexOf("/"));
+const configDir = process.env.STALWART_CONFIG_DIR || "/etc/stalwart";
 
 async function maybeAutodetectProxyTrustedNetworks() {
   if (process.env.STALWART_PROXY_TRUSTED_NETWORKS) {
@@ -33,5 +32,12 @@ async function maybeAutodetectProxyTrustedNetworks() {
 
 await maybeAutodetectProxyTrustedNetworks();
 await mkdir(configDir, { recursive: true });
-await writeFile(configPath, buildStalwartConfig(process.env), "utf8");
-console.log(`Wrote Stalwart config to ${configPath}`);
+const artifacts = buildStalwartArtifacts(process.env);
+await writeFile(`${configDir}/config.json`, `${JSON.stringify(artifacts.config, null, 2)}\n`, "utf8");
+await writeFile(`${configDir}/bootstrap.json`, `${JSON.stringify(artifacts.bootstrap, null, 2)}\n`, "utf8");
+await writeFile(
+  `${configDir}/apply-plan.ndjson`,
+  `${artifacts.applyPlan.map((item) => JSON.stringify(item)).join("\n")}\n`,
+  "utf8",
+);
+console.log(`Wrote Stalwart config, bootstrap, and apply plan to ${configDir}`);
