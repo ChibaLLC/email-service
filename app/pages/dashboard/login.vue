@@ -28,7 +28,7 @@
           />
         </UFormField>
         <UButton type="submit" block :loading="loading" color="primary"> Verify & Sign In </UButton>
-        <UButton variant="ghost" block color="neutral" @click="step = 'email'"> Use a different email </UButton>
+        <UButton variant="ghost" block color="neutral" @click="useDifferentEmail"> Use a different email </UButton>
       </form>
     </div>
   </div>
@@ -42,6 +42,10 @@ const code = ref("");
 const step = ref<"email" | "code">("email");
 const loading = ref(false);
 const toast = useToast();
+
+function useDifferentEmail() {
+  step.value = "email";
+}
 
 async function sendOTP() {
   if (!email.value) return;

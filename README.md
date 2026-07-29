@@ -65,6 +65,38 @@ Important: the current compose files use `expose` instead of `ports`. That works
 └───────────────────────────────┴──────────────────────────┘
 ```
 
+## Inbound IMAP Webhooks
+
+Inbound ingestion is optional and disabled by default. It polls one IMAP mailbox, encrypts raw MIME while it is pending in PostgreSQL, and delivers a signed `email.received` webhook. Successful delivery erases the MIME ciphertext immediately. Failed delivery retries for up to seven days before the ciphertext is erased, and delivery metadata is retained for 30 days.
+
+Run `pnpm db:migrate` before enabling ingestion. Generate the required AES-256-GCM key and webhook secret separately:
+
+```bash
+openssl rand -base64 32
+openssl rand -hex 32
+```
+
+Set `INBOUND_CONFIG_SOURCE=environment` and provide the `INBOUND_IMAP_*` and `INBOUND_WEBHOOK_*` variables from `.env.example`, or set `INBOUND_CONFIG_SOURCE=database` and configure the mailbox in `/dashboard`. Dashboard-managed usernames, passwords, and webhook secrets are encrypted with `INBOUND_CONFIG_ENCRYPTION_KEY`. Inbound settings and connection tests require an authenticated dashboard user whose exact address appears in `DASHBOARD_ADMIN_EMAILS`; the broader domain login policy does not grant access.
+
+Webhook requests include these headers:
+
+| Header                      | Value                                                           |
+| --------------------------- | --------------------------------------------------------------- |
+| `Idempotency-Key`           | Stable inbound message event ID                                 |
+| `X-Email-Service-Event`     | `email.received`                                                |
+| `X-Email-Service-Timestamp` | Unix timestamp in seconds                                       |
+| `X-Email-Service-Signature` | `v1=` plus HMAC-SHA256 of `<timestamp>.<raw JSON request body>` |
+
+Consumers must reject stale timestamps, verify the signature before parsing the payload, and deduplicate the event ID. Webhooks must use HTTPS and resolve to a public network by default. `INBOUND_WEBHOOK_ALLOW_PRIVATE_NETWORKS=true` permits HTTP/private targets only for trusted development or internal deployments.
+
+The webhook signature authenticates this service and protects the message in transit; it does not authenticate the original internet sender. Configure the receiving MTA to enforce the deployment's SPF, DKIM, and DMARC policy before mail reaches the IMAP mailbox, and keep sender-specific authorization in the webhook consumer.
+
+On first activation or after the mailbox identity/UIDVALIDITY changes, ingestion starts at the current UID high-water mark instead of replaying historical mail. PostgreSQL advisory locking ensures only one application instance polls the mailbox, while failed webhooks retry from the durable outbox. Ingestion pauses before advancing the IMAP cursor if 250 encrypted messages are already pending, bounding PostgreSQL MIME storage while leaving additional messages in the mailbox.
+
+Keep `INBOUND_CONFIG_ENCRYPTION_KEY` stable while database configuration or pending MIME exists. In-place key rotation is not supported; replacing the key makes existing ciphertext unreadable. If the key changes accidentally, restore the previous value before attempting recovery.
+
+Messages larger than 1 MB are recorded as failed metadata and skipped without loading the full MIME into application memory. The IMAP cursor advances past them, so mailbox retention or a separate large-message workflow is required if those messages matter to the consumer.
+
 ## API Usage
 
 ### Register for an API Key
