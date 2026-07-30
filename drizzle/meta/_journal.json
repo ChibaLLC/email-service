@@ -15,6 +15,13 @@
       "when": 1785347346533,
       "tag": "0001_naive_corsair",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785420000000,
+      "tag": "0002_inbound_webhook_destinations",
+      "breakpoints": true
     }
   ]
 }
