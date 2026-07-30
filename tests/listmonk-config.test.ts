@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getListmonkApiBaseUrl, getListmonkBasicAuthHeader, getListmonkProxyConfig } from "../server/listmonk/config";
+import { getListmonkApiBaseUrl, getListmonkBasicAuthHeader, getListmonkProxyConfig, listmonkSettingsInputSchema } from "../server/listmonk/config";
 
 describe("listmonk proxy config", () => {
   it("parses required proxy config", () => {
@@ -56,5 +56,10 @@ describe("listmonk proxy config", () => {
         LISTMONK_API_URL: "http://localhost:9000",
       }),
     ).toThrow(/LISTMONK_USERNAME is required/);
+  });
+
+  it("allows empty disabled settings but restricts configured URLs to HTTP(S)", () => {
+    expect(listmonkSettingsInputSchema.safeParse({ enabled: false, baseUrl: "", username: "" }).success).toBe(true);
+    expect(listmonkSettingsInputSchema.safeParse({ enabled: true, baseUrl: "ftp://example.com", username: "api" }).success).toBe(false);
   });
 });

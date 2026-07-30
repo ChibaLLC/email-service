@@ -67,7 +67,7 @@ Important: the current compose files use `expose` instead of `ports`. That works
 
 ## Inbound IMAP Webhooks
 
-Inbound ingestion is optional and disabled by default. It polls one IMAP mailbox, encrypts raw MIME while it is pending in PostgreSQL, and delivers a signed `email.received` webhook. Successful delivery erases the MIME ciphertext immediately. Failed delivery retries for up to seven days before the ciphertext is erased, and delivery metadata is retained for 30 days.
+Inbound ingestion is optional and disabled by default. It polls multiple IMAP accounts and folders, tracks an independent UID cursor for each folder, encrypts raw MIME while it is pending in PostgreSQL, and delivers signed `email.received` webhooks. Successful delivery erases the MIME ciphertext immediately. Failed delivery retries for up to seven days before the ciphertext is erased, and delivery metadata is retained for 30 days.
 
 Run `pnpm db:migrate` before enabling ingestion. Generate the required AES-256-GCM key and webhook secret separately:
 
@@ -76,7 +76,9 @@ openssl rand -base64 32
 openssl rand -hex 32
 ```
 
-Configure the mailbox and one or more webhook destinations in `/dashboard`. Each destination has its own signing secret and optional sender filters. A filter may be an exact address (for example, `calendar-notification@google.com`) or an entire sender domain (for example, `@gmail.com`); an empty filter list accepts every sender. Usernames, passwords, and webhook secrets are encrypted at rest with `INBOUND_CONFIG_ENCRYPTION_KEY`. Inbound settings and connection tests require an authenticated dashboard user whose exact address appears in `DASHBOARD_ADMIN_EMAILS`; the broader domain login policy does not grant access. A saved destination can be tested from the dashboard, which sends a signed `email.received.test` event without accessing the mailbox.
+Configure accounts, folders, and webhook destinations in `/dashboard/inbound`. Owners and admins manage IMAP accounts. Any authenticated dashboard member can create a webhook, subscribe it to folders across accounts, and add sender filters. A filter may be an exact address (for example, `calendar-notification@google.com`) or an entire sender domain (for example, `@gmail.com`); an empty filter list accepts every sender. Webhook URLs and secrets remain private to their creator. Owners and admins can moderate another member's routing metadata or delete the destination, but cannot view, replace, or test its credentials.
+
+Usernames, passwords, and webhook secrets are encrypted at rest with `INBOUND_CONFIG_ENCRYPTION_KEY`. Testing an owned destination sends a signed `email.received.test` event and displays the exact URL, headers, JSON body, and cURL command for replay in tools such as Postman.
 
 Webhook requests include these headers:
 
@@ -91,7 +93,9 @@ Consumers must reject stale timestamps, verify the signature before parsing the 
 
 The webhook signature authenticates this service and protects the message in transit; it does not authenticate the original internet sender. Configure the receiving MTA to enforce the deployment's SPF, DKIM, and DMARC policy before mail reaches the IMAP mailbox, and keep sender-specific authorization in the webhook consumer.
 
-On first activation or after the mailbox identity/UIDVALIDITY changes, ingestion starts at the current UID high-water mark instead of replaying historical mail. PostgreSQL advisory locking ensures only one application instance polls the mailbox, while failed webhooks retry from the durable outbox. Ingestion pauses before advancing the IMAP cursor if 250 encrypted messages are already pending, bounding PostgreSQL MIME storage while leaving additional messages in the mailbox.
+For raw SMTP calendar invitations, replies containing an RFC 5546 `text/calendar` part with `METHOD:REPLY` include a structured `email.calendarReply` object. It contains the event `uid`, `sequence`, organizer address, and attendee addresses with `partStat` values such as `ACCEPTED`, `DECLINED`, `TENTATIVE`, or `NEEDS-ACTION`. The original MIME remains available as `email.rawMimeBase64`. Calendar events created through provider APIs should instead use that provider's event-change notifications and response-status fields.
+
+On first activation or after a folder identity/UIDVALIDITY changes, ingestion starts at the current UID high-water mark instead of replaying historical mail. PostgreSQL advisory locking ensures only one application instance polls and serializes configuration changes with ingestion, while failed webhooks retry from the durable outbox. Ingestion pauses before advancing an IMAP cursor if 250 encrypted messages are already pending, bounding PostgreSQL MIME storage while leaving additional messages in the mailbox.
 
 Keep `INBOUND_CONFIG_ENCRYPTION_KEY` stable while database configuration or pending MIME exists. In-place key rotation is not supported; replacing the key makes existing ciphertext unreadable. If the key changes accidentally, restore the previous value before attempting recovery.
 

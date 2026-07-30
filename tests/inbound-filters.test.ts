@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesSenderFilters, normalizeSenderFilters } from "../server/inbound/filters";
+import { matchesSenderFilters, matchesWebhookRoute, normalizeSenderFilters } from "../server/inbound/filters";
 
 describe("inbound sender filters", () => {
   it("delivers every sender when the filter list is empty", () => {
@@ -16,5 +16,12 @@ describe("inbound sender filters", () => {
 
   it("normalizes and deduplicates filter values", () => {
     expect(normalizeSenderFilters([" @gmail.com ", "@GMAIL.COM", ""])).toEqual(["@gmail.com"]);
+  });
+
+  it("requires both a mailbox subscription and matching sender", () => {
+    const webhook = { mailboxIds: ["inbox"], senderFilters: ["@example.com"] };
+    expect(matchesWebhookRoute("inbox", "guest@example.com", webhook)).toBe(true);
+    expect(matchesWebhookRoute("archive", "guest@example.com", webhook)).toBe(false);
+    expect(matchesWebhookRoute("inbox", "guest@other.test", webhook)).toBe(false);
   });
 });

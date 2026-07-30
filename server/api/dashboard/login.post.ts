@@ -2,8 +2,8 @@ import { z } from "zod";
 import { render } from "@vue-email/render";
 import { generateOTP } from "../../utils/otp";
 import { getEmailProvider } from "../../email/providers";
-import { validateEmail } from "~~/shared/utils/utils";
 import OtpEmail from "../../emails/OtpEmail.vue";
+import { isLoginEmailAllowed } from "../../settings/policy";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -17,8 +17,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Validate email domain against allow-list
-  const { valid } = validateEmail(data.email);
-  if (!valid) {
+  if (!(await isLoginEmailAllowed(data.email))) {
     throw createError({
       statusCode: 403,
       message: "Email domain not allowed. Must be from an approved organization.",

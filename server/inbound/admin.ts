@@ -1,21 +1,32 @@
-import { env } from "std-env";
 import type { H3Event } from "h3";
+import { assertDashboardAdmin, getDashboardEmail, getDashboardRole, isAdminRole } from "../settings/policy";
 
-export function assertInboundDashboardAdmin(event: H3Event) {
-  const admins = (env.DASHBOARD_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  if (admins.length === 0) {
-    throw createError({
-      statusCode: 503,
-      message: "DASHBOARD_ADMIN_EMAILS must be configured to manage inbound email settings.",
-    });
+export async function assertInboundDashboardAdmin(event: H3Event) {
+  return assertDashboardAdmin(event);
+}
+
+export async function getInboundActor(event: H3Event) {
+  const email = getDashboardEmail(event);
+  const { role } = await getDashboardRole(email);
+  return { email, role, canModerate: isAdminRole(role) };
+}
+
+export function canManageWebhook(actor: { email: string; canModerate: boolean }, ownerEmail: string): boolean {
+  return actor.email === ownerEmail || actor.canModerate;
+}
+
+export function canAccessWebhookCredentials(actorEmail: string, ownerEmail: string): boolean {
+  return actorEmail === ownerEmail;
+}
+
+export function assertWebhookAccess(actor: { email: string; canModerate: boolean }, ownerEmail: string) {
+  if (!canManageWebhook(actor, ownerEmail)) {
+    throw createError({ statusCode: 403, message: "You may only manage your own webhooks" });
   }
+}
 
-  const context = event.context as { dashboardUser?: { email?: string } };
-  const email = context.dashboardUser?.email?.trim().toLowerCase();
-  if (!email || !admins.includes(email)) {
-    throw createError({ statusCode: 403, message: "Inbound email settings require dashboard administrator access." });
+export function assertWebhookCredentialsOwner(actorEmail: string, ownerEmail: string) {
+  if (!canAccessWebhookCredentials(actorEmail, ownerEmail)) {
+    throw createError({ statusCode: 403, message: "Only the webhook owner may access or test its credentials" });
   }
 }

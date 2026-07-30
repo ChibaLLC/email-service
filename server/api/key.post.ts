@@ -5,9 +5,13 @@ import { hashApiKey } from "../utils/auth";
 import { db, schema } from "../database";
 import { getEmailProvider } from "../email/providers";
 import ApiKeyEmail from "../emails/ApiKeyEmail.vue";
+import { z } from "zod";
+import { isApiKeyEmailAllowed } from "../settings/policy";
+
+const apiKeyEmailSchema = z.object({ email: z.string().trim().toLowerCase().email() });
 
 export default defineEventHandler(async (event) => {
-  const { data, error } = await readValidatedBody(event, emailShema.safeParse);
+  const { data, error } = await readValidatedBody(event, apiKeyEmailSchema.safeParse);
   if (error) {
     throw createError({
       statusCode: 400,
@@ -15,6 +19,10 @@ export default defineEventHandler(async (event) => {
       data: error.errors,
       cause: error.cause,
     });
+  }
+
+  if (!(await isApiKeyEmailAllowed(data.email))) {
+    throw createError({ statusCode: 403, message: "Email domain is not allowed for API keys" });
   }
 
   // Generate a unique API key

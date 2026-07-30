@@ -13,3 +13,11 @@ export function matchesSenderFilters(sender: string | undefined, filters: string
     ),
   );
 }
+
+export function matchesWebhookRoute(
+  mailboxId: string,
+  sender: string | undefined,
+  webhook: { mailboxIds: string[]; senderFilters: string[] },
+): boolean {
+  return webhook.mailboxIds.includes(mailboxId) && matchesSenderFilters(sender, webhook.senderFilters);
+}
