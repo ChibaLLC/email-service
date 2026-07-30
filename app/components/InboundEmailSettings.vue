@@ -37,14 +37,14 @@
     </div>
 
     <div v-if="error" class="p-5 text-sm text-gray-400">
-      Inbound settings are available only to configured dashboard administrators.
+      {{
+        error.statusCode === 503
+          ? "DASHBOARD_ADMIN_EMAILS must be configured before inbound settings can be managed."
+          : "Inbound settings are available only to configured dashboard administrators."
+      }}
     </div>
     <div v-else-if="config" class="p-5">
-      <div class="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <div class="rounded-lg bg-gray-950/60 p-3">
-          <div class="text-xs uppercase tracking-wide text-gray-500">Source</div>
-          <div class="mt-1 font-medium capitalize">{{ config.source }}</div>
-        </div>
+      <div class="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-lg bg-gray-950/60 p-3">
           <div class="text-xs uppercase tracking-wide text-gray-500">Last success</div>
           <div class="mt-1 text-sm font-medium">{{ formatDate(config.status.lastSuccessAt) }}</div>
@@ -71,12 +71,6 @@
       >
         {{ config.status.lastError }}
       </div>
-      <div
-        v-if="!config.editable"
-        class="mb-5 rounded-lg border border-sky-900/70 bg-sky-950/30 p-3 text-sm text-sky-200"
-      >
-        Environment configuration is read-only. Set <code>INBOUND_CONFIG_SOURCE=database</code> to manage it here.
-      </div>
 
       <form class="space-y-5" @submit.prevent="save">
         <div class="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950/30 p-4">
@@ -84,28 +78,21 @@
             <div class="font-medium">Mailbox ingestion</div>
             <div class="text-sm text-gray-500">Disabled configurations do not open IMAP or send webhooks.</div>
           </div>
-          <USwitch v-model="form.enabled" :disabled="!config.editable" />
+          <USwitch v-model="form.enabled" />
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <UFormField label="IMAP host" class="lg:col-span-2">
-            <UInput v-model="form.host" class="w-full" placeholder="mail.example.com" :disabled="!config.editable" />
+            <UInput v-model="form.host" class="w-full" placeholder="mail.example.com" />
           </UFormField>
           <UFormField label="Port">
-            <UInput v-model.number="form.port" type="number" class="w-full" :disabled="!config.editable" />
+            <UInput v-model.number="form.port" type="number" class="w-full" />
           </UFormField>
           <UFormField label="Poll interval (seconds)">
-            <UInput
-              v-model.number="form.pollIntervalSeconds"
-              type="number"
-              min="10"
-              max="3600"
-              class="w-full"
-              :disabled="!config.editable"
-            />
+            <UInput v-model.number="form.pollIntervalSeconds" type="number" min="10" max="3600" class="w-full" />
           </UFormField>
           <UFormField label="Username" class="lg:col-span-2">
-            <UInput v-model="form.username" class="w-full" autocomplete="username" :disabled="!config.editable" />
+            <UInput v-model="form.username" class="w-full" autocomplete="username" />
           </UFormField>
           <UFormField label="Password" class="lg:col-span-2">
             <UInput
@@ -114,15 +101,14 @@
               class="w-full"
               autocomplete="new-password"
               :placeholder="config.hasPassword ? 'Leave blank to keep current password' : 'Required when enabled'"
-              :disabled="!config.editable"
             />
           </UFormField>
           <UFormField label="Mailbox" class="lg:col-span-2">
-            <UInput v-model="form.mailbox" class="w-full" placeholder="INBOX" :disabled="!config.editable" />
+            <UInput v-model="form.mailbox" class="w-full" placeholder="INBOX" />
           </UFormField>
           <div class="flex items-end lg:col-span-2">
             <label class="flex h-10 items-center gap-3 text-sm text-gray-300">
-              <USwitch v-model="form.secure" :disabled="!config.editable" />
+              <USwitch v-model="form.secure" />
               Implicit TLS (normally port 993)
             </label>
           </div>
@@ -132,7 +118,6 @@
               type="url"
               class="w-full font-mono text-sm"
               placeholder="https://app.example.com/api/v1/emails/inbound"
-              :disabled="!config.editable"
             />
           </UFormField>
           <UFormField label="Webhook secret">
@@ -142,12 +127,11 @@
               class="w-full"
               autocomplete="new-password"
               :placeholder="config.hasWebhookSecret ? 'Keep current secret' : 'At least 32 characters'"
-              :disabled="!config.editable"
             />
           </UFormField>
         </div>
 
-        <div v-if="config.editable" class="flex justify-end">
+        <div class="flex justify-end">
           <UButton type="submit" icon="i-material-symbols-light-save-outline" :loading="saving"
             >Save inbound settings</UButton
           >

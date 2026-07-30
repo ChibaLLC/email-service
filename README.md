@@ -76,7 +76,7 @@ openssl rand -base64 32
 openssl rand -hex 32
 ```
 
-Set `INBOUND_CONFIG_SOURCE=environment` and provide the `INBOUND_IMAP_*` and `INBOUND_WEBHOOK_*` variables from `.env.example`, or set `INBOUND_CONFIG_SOURCE=database` and configure the mailbox in `/dashboard`. Dashboard-managed usernames, passwords, and webhook secrets are encrypted with `INBOUND_CONFIG_ENCRYPTION_KEY`. Inbound settings and connection tests require an authenticated dashboard user whose exact address appears in `DASHBOARD_ADMIN_EMAILS`; the broader domain login policy does not grant access.
+Configure the mailbox and webhook in `/dashboard`. Usernames, passwords, and webhook secrets are encrypted at rest with `INBOUND_CONFIG_ENCRYPTION_KEY`. Inbound settings and connection tests require an authenticated dashboard user whose exact address appears in `DASHBOARD_ADMIN_EMAILS`; the broader domain login policy does not grant access.
 
 Webhook requests include these headers:
 
