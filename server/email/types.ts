@@ -2,9 +2,7 @@ export interface EmailAttachment {
   /** File name for the attachment */
   filename: string;
   /** String or base64-encoded content */
-  content?: string;
-  /** URL or file path to fetch content from */
-  path?: string;
+  content: string;
   /** MIME type, e.g. "text/calendar", "application/pdf" */
   contentType?: string;
   /** Content encoding, e.g. "base64" */

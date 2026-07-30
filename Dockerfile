@@ -1,6 +1,7 @@
 # ---- Build Stage ----
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app

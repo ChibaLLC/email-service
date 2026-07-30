@@ -62,25 +62,44 @@
   },
   "packageManager": "pnpm@10.30.2",
   "dependencies": {
+    "@nuxt/content": "^3.15.2",
     "@mailchimp/mailchimp_transactional": "^1.4.1",
     "@sendgrid/mail": "^8.1.6",
     "@vue-email/render": "^0.0.9",
+    "better-sqlite3": "^12.5.0",
     "bullmq": "^5.73.0",
     "consola": "^3.4.2",
-    "drizzle-orm": "^0.39.3",
-    "echarts": "^6.0.0",
+    "drizzle-orm": "^0.45.2",
+    "echarts": "^6.1.0",
     "imapflow": "^1.6.5",
     "ioredis": "^5.10.1",
     "jose": "^6.2.2",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^9.0.1",
     "nuxt-echarts": "^1.0.1",
     "pg": "^8.20.0",
     "resend": "^6.10.0",
     "shiki": "^3.23.0",
     "std-env": "^4.0.0",
     "ulid": "^2.4.0",
-    "uuid": "^11.1.0",
+    "uuid": "^11.1.1",
     "vue-echarts": "^8.0.1",
     "zod": "^3.25.76"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ],
+    "overrides": {
+      "axios": "^1.18.0",
+      "brace-expansion": "5.0.8",
+      "esbuild": "^0.28.1",
+      "form-data": "^4.0.6",
+      "js-cookie": "^3.0.7",
+      "js-yaml": "^4.3.0",
+      "postcss": "^8.5.18",
+      "valibot": "^1.4.2",
+      "vite": "^7.3.5",
+      "uuid": "^11.1.1"
+    }
   }
 }

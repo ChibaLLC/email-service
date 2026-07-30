@@ -84,7 +84,7 @@
       <div class="flex flex-col gap-4 border-b border-gray-800 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div class="flex items-center gap-2"><Icon name="material-symbols-light:webhook" class="size-5 text-lime-400" /><h2 class="font-semibold">Webhook destinations</h2><UBadge color="neutral" variant="subtle">{{ webhookForms.length }}</UBadge></div>
-          <p class="mt-1 text-sm text-gray-400">Every member can add private destinations. Owners and admins can moderate routing, but only the creator can see credentials or send tests.</p>
+          <p class="mt-1 text-sm text-gray-400">Administrators manage signed destinations and mailbox routing. Webhook credentials are never returned after creation.</p>
         </div>
         <UButton variant="soft" icon="i-material-symbols-light-add" :disabled="mailboxOptions.length === 0" @click="addWebhook">Add webhook</UButton>
       </div>

@@ -55,6 +55,8 @@ describe("NodemailerProvider", () => {
         user: "mailer@example.com",
         pass: "secret",
       },
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   });
 
@@ -89,6 +91,8 @@ describe("NodemailerProvider", () => {
           contentType: "text/plain",
         },
       ],
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
     expect(result).toEqual({
       success: true,
@@ -113,6 +117,8 @@ describe("NodemailerProvider", () => {
       to: "allan.bosire@ifkafin.com",
       subject: "Plain Text",
       text: "Hello from Nodemailer",
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   });
 

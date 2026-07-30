@@ -5,8 +5,12 @@ import { getDefaultFromAddress } from "../../email/config";
 import { getActiveOutboundSettings } from "../../email/settings";
 import TestEmail from "../../emails/TestEmail.vue";
 import { addEmailJob } from "../../queue/email.queue";
+import { assertDashboardOperator } from "../../settings/policy";
+import { enforceRateLimit } from "../../security/rate-limit";
 
 export default defineEventHandler(async (event) => {
+  const actor = await assertDashboardOperator(event);
+  await enforceRateLimit("dashboard-test-email", actor.email, 5, 15 * 60);
   const dashboardUser = event.context.dashboardUser as { email?: string } | undefined;
 
   if (!dashboardUser?.email) {

@@ -17,6 +17,8 @@ export class NodemailerProvider implements EmailProvider {
         user: this.config.SMTP_USER,
         pass: this.config.SMTP_PASS,
       },
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   }
 
@@ -28,6 +30,8 @@ export class NodemailerProvider implements EmailProvider {
         subject: message.subject,
         ...(message.html ? { html: message.html } : { text: message.text }),
         ...(message.attachments?.length ? { attachments: message.attachments } : {}),
+        disableFileAccess: true,
+        disableUrlAccess: true,
       });
 
       return {

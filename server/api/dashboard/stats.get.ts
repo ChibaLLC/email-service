@@ -1,7 +1,9 @@
 import { db, schema } from "../../database";
 import { sql, eq, gte, count } from "drizzle-orm";
+import { assertDashboardOperator } from "../../settings/policy";
 
 export default defineEventHandler(async (event) => {
+  await assertDashboardOperator(event);
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);

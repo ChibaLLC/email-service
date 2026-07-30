@@ -1,6 +1,8 @@
 import { getEmailQueue } from "../../queue/email.queue";
+import { assertDashboardOperator } from "../../settings/policy";
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  await assertDashboardOperator(event);
   const queue = getEmailQueue();
 
   const [waiting, active, completed, failed, delayed] = await Promise.all([

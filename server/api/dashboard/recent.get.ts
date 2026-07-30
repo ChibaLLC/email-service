@@ -1,7 +1,9 @@
 import { db, schema } from "../../database";
 import { desc } from "drizzle-orm";
+import { assertDashboardOperator } from "../../settings/policy";
 
 export default defineEventHandler(async (event) => {
+  await assertDashboardOperator(event);
   const query = getQuery(event);
   const limit = Math.min(Number(query.limit) || 50, 100);
   const offset = Number(query.offset) || 0;

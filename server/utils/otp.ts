@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { getRedisConnection } from "../queue/connection";
 
 const OTP_TTL_SECONDS = 5 * 60; // 5 minutes
+const OTP_MAX_ATTEMPTS = 5;
 const OTP_PREFIX = "otp:";
 
 /**
@@ -12,8 +13,7 @@ export async function generateOTP(email: string): Promise<string> {
   const redis = getRedisConnection();
   const key = `${OTP_PREFIX}${email.toLowerCase()}`;
 
-  // Store with TTL — overwrites any existing OTP for this email
-  await redis.set(key, code, "EX", OTP_TTL_SECONDS);
+  await redis.multi().del(key).hset(key, { code, attempts: "0" }).expire(key, OTP_TTL_SECONDS).exec();
 
   return code;
 }
@@ -27,12 +27,16 @@ export async function verifyOTP(email: string, code: string): Promise<boolean> {
   const redis = getRedisConnection();
   const key = `${OTP_PREFIX}${email.toLowerCase()}`;
 
-  const stored = await redis.get(key);
-  if (!stored || stored !== code) {
-    return false;
-  }
-
-  // Delete on success — one-time use
-  redis.del(key);
-  return true;
+  const result = await redis.eval(`
+    local stored = redis.call('HGET', KEYS[1], 'code')
+    if not stored then return 0 end
+    local attempts = redis.call('HINCRBY', KEYS[1], 'attempts', 1)
+    if stored == ARGV[1] then
+      redis.call('DEL', KEYS[1])
+      return 1
+    end
+    if attempts >= tonumber(ARGV[2]) then redis.call('DEL', KEYS[1]) end
+    return 0
+  `, 1, key, code, OTP_MAX_ATTEMPTS);
+  return result === 1;
 }

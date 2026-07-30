@@ -1,5 +1,6 @@
 import { verifyJWT, getJWTSecret } from "../utils/jwt";
 import { DASHBOARD_COOKIE_NAME } from "../utils/cookie";
+import { isLoginEmailAllowed } from "../settings/policy";
 
 export default defineEventHandler(async (event) => {
   const path = getRequestURL(event).pathname;
@@ -26,6 +27,7 @@ export default defineEventHandler(async (event) => {
   try {
     const secret = getJWTSecret();
     const payload = await verifyJWT(token, secret);
+    if (!payload.email || !(await isLoginEmailAllowed(payload.email))) throw new Error("Dashboard access revoked");
 
     // Attach user info to event context
     event.context.dashboardUser = {

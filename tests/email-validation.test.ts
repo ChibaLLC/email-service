@@ -33,6 +33,8 @@ describe("Email Validation", () => {
   it("should not match partial domain names", () => {
     // "notifkafin.com" should NOT match "ifkafin.com"
     expect(validateEmail("user@notifkafin.com").valid).toBe(false);
+    expect(validateEmail("ifkafin.com").valid).toBe(false);
+    expect(validateEmail("x.ifkafin.com").valid).toBe(false);
   });
 
   describe("getAllowedDomains()", () => {

@@ -1,9 +1,8 @@
 export interface EmailAttachment {
   filename: string;
-  content?: string;
-  path?: string;
+  content: string;
   contentType?: string;
-  encoding?: string;
+  encoding?: "base64";
 }
 
 export interface EmailMessage {

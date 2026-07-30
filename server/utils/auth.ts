@@ -41,8 +41,7 @@ export async function useAuth(event: H3Event, throwError: boolean = true) {
 }
 
 export function readAuthToken(event: H3Event): string | null {
-  let auth = getHeader(event, "Authorization") || null;
-  if (!auth) auth = getCookie(event, "Authorization") || null;
+  const auth = getHeader(event, "Authorization") || null;
   if (!auth) return null;
 
   const [bearer, token] = auth.split(" ");
