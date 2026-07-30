@@ -1,4 +1,4 @@
-export type InboundConfigSource = "environment" | "database";
+export type InboundConfigSource = "database";
 
 export interface InboundConfig {
   enabled: true;

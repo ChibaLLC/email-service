@@ -68,7 +68,7 @@ export interface QueueStats {
 }
 
 export interface InboundEmailConfigView {
-  source: "environment" | "database";
+  source: "database";
   editable: boolean;
   enabled: boolean;
   host: string;
