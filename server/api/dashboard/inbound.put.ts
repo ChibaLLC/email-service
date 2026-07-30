@@ -2,7 +2,7 @@ import { inboundConfigInputSchema, saveInboundConfig } from "../../inbound/confi
 import { assertInboundDashboardAdmin } from "../../inbound/admin";
 
 export default defineEventHandler(async (event) => {
-  assertInboundDashboardAdmin(event);
+  await assertInboundDashboardAdmin(event);
   const input = await readValidatedBody(event, inboundConfigInputSchema.parse);
   try {
     await saveInboundConfig(input);

@@ -2,7 +2,7 @@ import { assertInboundDashboardAdmin } from "../../../../../inbound/admin";
 import { verifyInboundWebhook } from "../../../../../inbound/service";
 
 export default defineEventHandler(async (event) => {
-  assertInboundDashboardAdmin(event);
+  await assertInboundDashboardAdmin(event);
   try {
     return await verifyInboundWebhook(getRouterParam(event, "id") || "");
   } catch (error) {

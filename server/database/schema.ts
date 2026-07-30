@@ -1,8 +1,10 @@
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -10,10 +12,12 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { ulid } from "ulid";
 
 export const emailStatusEnum = pgEnum("email_status", ["queued", "sending", "sent", "failed"]);
 export const inboundDeliveryStatusEnum = pgEnum("inbound_delivery_status", ["pending", "delivered", "failed"]);
+export const dashboardMemberRoleEnum = pgEnum("dashboard_member_role", ["owner", "admin", "operator", "viewer"]);
 
 export const apiKeys = pgTable("api_keys", {
   id: text("id")
@@ -141,4 +145,48 @@ export const inboundWebhookDeliveries = pgTable(
     uniqueIndex("inbound_webhook_deliveries_message_webhook_unique").on(table.messageId, table.webhookId),
     index("inbound_webhook_deliveries_due_idx").on(table.status, table.nextAttemptAt),
   ],
+);
+
+export const dashboardAccessSettings = pgTable(
+  "dashboard_access_settings",
+  {
+    id: varchar("id", { length: 32 }).primaryKey(),
+    loginDomains: text("login_domains").array().notNull().default([]),
+    apiKeyDomains: text("api_key_domains").array().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [check("dashboard_access_settings_singleton_check", sql`${table.id} = 'primary'`)],
+);
+
+export const dashboardMembers = pgTable("dashboard_members", {
+  email: text("email").primaryKey(),
+  role: dashboardMemberRoleEnum("role").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const integrationSettings = pgTable("integration_settings", {
+  integration: varchar("integration", { length: 64 }).primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  baseUrl: text("base_url"),
+  username: text("username"),
+  passwordEncrypted: text("password_encrypted"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const settingsAuditEvents = pgTable(
+  "settings_audit_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => ulid()),
+    actorEmail: text("actor_email").notNull(),
+    action: varchar("action", { length: 100 }).notNull(),
+    target: varchar("target", { length: 100 }).notNull(),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("settings_audit_events_created_at_idx").on(table.createdAt)],
 );

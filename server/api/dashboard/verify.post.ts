@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { verifyOTP } from "../../utils/otp";
 import { signJWT, getJWTSecret } from "../../utils/jwt";
-import { validateEmail } from "~~/shared/utils/utils";
 import { DASHBOARD_LOGGED_IN_COOKIE } from "~~/shared/utils/cookie";
+import { isLoginEmailAllowed } from "../../settings/policy";
 import {
   DASHBOARD_COOKIE_NAME,
   getDashboardCookieOptions,
@@ -25,8 +25,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Re-validate domain (defense in depth)
-  const { valid } = validateEmail(data.email);
-  if (!valid) {
+  if (!(await isLoginEmailAllowed(data.email))) {
     throw createError({ statusCode: 403, message: "Email domain not allowed" });
   }
 

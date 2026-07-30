@@ -22,6 +22,13 @@
       "when": 1785420000000,
       "tag": "0002_inbound_webhook_destinations",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785423600000,
+      "tag": "0003_dashboard_settings",
+      "breakpoints": true
     }
   ]
 }
