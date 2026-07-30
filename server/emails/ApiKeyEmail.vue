@@ -5,32 +5,51 @@ defineProps<{
 </script>
 
 <template>
-  <div :style="{ fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto' }">
-    <h2 :style="{ color: '#18181b' }">Your API Key</h2>
-    <p :style="{ color: '#71717a' }">
-      Here is your API key. <strong>Store it securely — it will not be shown again.</strong>
+  <div
+    :style="{
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      maxWidth: '600px',
+      margin: '0 auto',
+      padding: '32px 24px',
+      color: '#27272a',
+      lineHeight: 1.6,
+    }"
+  >
+    <p :style="{ margin: '0 0 28px', color: '#71717a', fontSize: '13px' }">Email Service</p>
+    <h1 :style="{ margin: '0 0 12px', color: '#18181b', fontSize: '24px', lineHeight: 1.25 }">
+      Your API key
+    </h1>
+    <p :style="{ margin: '0 0 20px', color: '#52525b', fontSize: '15px' }">
+      This key will only be shown once. Store it somewhere secure before using it.
     </p>
-    <div
+    <p
       :style="{
-        background: '#f4f4f5',
-        padding: '16px',
-        borderRadius: '8px',
-        fontFamily: 'monospace',
+        margin: '0 0 28px',
+        padding: '14px 0',
+        borderTop: '1px solid #d4d4d8',
+        borderBottom: '1px solid #d4d4d8',
+        fontFamily: 'Courier New, monospace',
         wordBreak: 'break-all',
         fontSize: '14px',
       }"
     >
       {{ apiKey }}
-    </div>
-    <h3 :style="{ color: '#18181b', marginTop: '24px' }">Usage</h3>
+    </p>
+    <h2 :style="{ margin: '0 0 8px', color: '#18181b', fontSize: '17px' }">Use the key</h2>
+    <p :style="{ margin: '0 0 12px', color: '#52525b', fontSize: '14px' }">
+      Send it as a bearer token in the Authorization header.
+    </p>
     <pre
       :style="{
-        background: '#18181b',
-        color: '#a1a1aa',
+        margin: 0,
+        background: '#fafafa',
+        border: '1px solid #e4e4e7',
+        color: '#3f3f46',
         padding: '16px',
-        borderRadius: '8px',
         overflowX: 'auto',
+        fontFamily: 'Courier New, monospace',
         fontSize: '13px',
+        lineHeight: 1.5,
       }"
     >
 fetch("https://your-domain/send", {
