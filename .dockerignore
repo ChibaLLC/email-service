@@ -18,9 +18,6 @@ logs
 .fleet
 .idea
 
-# Drizzle migrations
-drizzle/
-
 # Local env files
 .env
 .env.*
