@@ -2,6 +2,7 @@ import { consola } from "consola";
 import { runInboundCycle } from "../inbound/service";
 
 export default defineNitroPlugin((nitroApp) => {
+  if (import.meta.prerender) return;
   const logger = consola.withTag("plugin:inbound-email");
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;

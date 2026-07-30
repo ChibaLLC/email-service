@@ -5,8 +5,7 @@ import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "
 function mapAttachment(attachment: EmailAttachment) {
   return {
     filename: attachment.filename,
-    ...(attachment.content ? { content: attachment.content } : {}),
-    ...(attachment.path ? { path: attachment.path } : {}),
+    content: attachment.content,
     ...(attachment.contentType ? { contentType: attachment.contentType } : {}),
   };
 }

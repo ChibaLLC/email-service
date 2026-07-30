@@ -269,7 +269,7 @@ async function postWebhook(
       },
       (response) => {
         response.on("error", reject);
-        response.resume();
+        response.destroy();
         resolve(response.statusCode || 0);
       },
     );

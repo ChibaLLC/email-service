@@ -1,8 +1,9 @@
-import { assertWebhookCredentialsOwner, getInboundActor } from "../../../../../inbound/admin";
+import { assertInboundDashboardAdmin, assertWebhookCredentialsOwner, getInboundActor } from "../../../../../inbound/admin";
 import { getInboundWebhook } from "../../../../../inbound/config";
 import { verifyInboundWebhook } from "../../../../../inbound/service";
 
 export default defineEventHandler(async (event) => {
+  await assertInboundDashboardAdmin(event);
   const actor = await getInboundActor(event);
   const id = getRouterParam(event, "id") || "";
   const webhook = await getInboundWebhook(id);

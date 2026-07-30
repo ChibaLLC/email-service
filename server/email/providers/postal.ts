@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { getDefaultFromAddress, type PostalConfig } from "../config";
 import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "../types";
 
@@ -28,15 +27,9 @@ function getSendEndpoint(apiUrl: string): string {
 }
 
 async function mapAttachment(attachment: EmailAttachment) {
-  const data = attachment.content || (attachment.path ? (await readFile(attachment.path)).toString("base64") : undefined);
-
-  if (!data) {
-    throw new Error(`Attachment "${attachment.filename}" is missing content or path`);
-  }
-
   return {
     name: attachment.filename,
-    data,
+    data: attachment.content,
     ...(attachment.contentType ? { content_type: attachment.contentType } : {}),
   };
 }

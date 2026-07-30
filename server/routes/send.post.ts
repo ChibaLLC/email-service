@@ -1,33 +1,12 @@
-import { z } from "zod";
 import { db, schema } from "../database";
 import { getDefaultFromAddress } from "../email/config";
 import { getActiveOutboundSettings } from "../email/settings";
 import { addEmailJob } from "../queue/email.queue";
 import { hashApiKey } from "../utils/auth";
 import { eq } from "drizzle-orm";
-
-const attachmentSchema = z.object({
-  filename: z.string(),
-  content: z.string().optional(),
-  path: z.string().optional(),
-  contentType: z.string().optional(),
-  encoding: z.string().optional(),
-});
-
-const sendSchema = z
-  .object({
-    from: z
-      .string()
-      .optional()
-      .refine(
-        (email) => (email ? validateEmail(email).valid : true),
-        "The 'from' email provided is not a valid email.",
-      ),
-    to: z.union([z.string(), z.array(z.string())]),
-    subject: z.string(),
-    attachments: z.array(attachmentSchema).optional(),
-  })
-  .and(z.union([z.object({ text: z.string() }), z.object({ html: z.string() })]));
+import { sendEmailSchema } from "../email/request";
+import { enforceRateLimit } from "../security/rate-limit";
+import { readLimitedJsonBody } from "../security/body";
 
 export default defineEventHandler(async (event) => {
   // Authenticate
@@ -47,19 +26,29 @@ export default defineEventHandler(async (event) => {
   }
 
   // Validate body
-  const { data, error } = await readValidatedBody(event, sendSchema.safeParse);
+  const { data, error } = sendEmailSchema.safeParse(await readLimitedJsonBody(event, 22_000_000));
   if (error) {
     throw createError({
       statusCode: 400,
       message: error.message,
-      data: await readBody(event),
-      cause: error.cause,
+      data: error.flatten(),
     });
   }
 
   const outbound = await getActiveOutboundSettings();
-  const from = data.from || getDefaultFromAddress(outbound.config);
+  await enforceRateLimit("send", apiKey.id, 60, 60);
+  const defaultFrom = getDefaultFromAddress(outbound.config).toLowerCase();
+  const requestedFrom = data.from?.toLowerCase();
+  if (requestedFrom && requestedFrom !== apiKey.email.toLowerCase() && requestedFrom !== defaultFrom) {
+    throw createError({ statusCode: 403, message: "This API key is not authorized for the requested sender" });
+  }
+  const from = requestedFrom || defaultFrom;
   const bodyType = "html" in data ? "html" : "text";
+  const attachments = data.attachments?.map((attachment) => ({
+    ...attachment,
+    content: attachment.encoding === "base64" ? attachment.content : Buffer.from(attachment.content, "utf8").toString("base64"),
+    encoding: "base64" as const,
+  }));
 
   // Insert email record
   const [emailRecord] = await db
@@ -84,7 +73,7 @@ export default defineEventHandler(async (event) => {
       to: data.to,
       subject: data.subject,
       ...("html" in data ? { html: data.html } : { text: data.text }),
-      ...(data.attachments?.length ? { attachments: data.attachments } : {}),
+      ...(attachments?.length ? { attachments } : {}),
     });
   } catch (error) {
     await db.update(schema.emails).set({ status: "failed", error: "Could not enqueue email" }).where(eq(schema.emails.id, emailRecord!.id));

@@ -20,13 +20,14 @@ export type EmailValidationResult = {
 };
 
 export function validateEmail(email: string): EmailValidationResult {
-  if (!email) return { valid: false, type: undefined };
+  if (!email || !z.string().email().safeParse(email).success) return { valid: false, type: undefined };
 
   const allowedDomains = getAllowedDomains();
   const emailLower = email.toLowerCase();
+  const emailDomain = emailLower.slice(emailLower.lastIndexOf("@") + 1);
 
   for (const domain of allowedDomains) {
-    if (emailLower.endsWith(`@${domain}`) || emailLower.endsWith(`.${domain}`)) {
+    if (emailDomain === domain || emailDomain.endsWith(`.${domain}`)) {
       return { valid: true, type: domain.split(".")[0] };
     }
   }

@@ -8,6 +8,8 @@ import {
   getDashboardCookieOptions,
   getDashboardLoggedInCookieOptions,
 } from "../../utils/cookie";
+import { enforceRateLimit, requestSource } from "../../security/rate-limit";
+import { readLimitedJsonBody } from "../../security/body";
 
 const verifySchema = z.object({
   email: z.string().email(),
@@ -15,7 +17,7 @@ const verifySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const { data, error } = await readValidatedBody(event, verifySchema.safeParse);
+  const { data, error } = verifySchema.safeParse(await readLimitedJsonBody(event, 4096));
 
   if (error) {
     throw createError({
@@ -24,13 +26,17 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // Re-validate domain (defense in depth)
-  if (!(await isLoginEmailAllowed(data.email))) {
+  const email = data.email.trim().toLowerCase();
+  await Promise.all([
+    enforceRateLimit("dashboard-verify-email", email, 10, 15 * 60),
+    enforceRateLimit("dashboard-verify-source", requestSource(event), 300, 15 * 60),
+  ]);
+  if (!(await isLoginEmailAllowed(email))) {
     throw createError({ statusCode: 403, message: "Email domain not allowed" });
   }
 
   // Verify OTP
-  const isValid = await verifyOTP(data.email, data.code);
+  const isValid = await verifyOTP(email, data.code);
   if (!isValid) {
     throw createError({
       statusCode: 401,
@@ -40,7 +46,7 @@ export default defineEventHandler(async (event) => {
 
   // Mint JWT
   const secret = getJWTSecret();
-  const token = await signJWT({ email: data.email }, secret);
+  const token = await signJWT({ email }, secret);
 
   // Set signed cookie
   setCookie(event, DASHBOARD_COOKIE_NAME, token, getDashboardCookieOptions());
@@ -48,5 +54,5 @@ export default defineEventHandler(async (event) => {
   // Set non-HttpOnly cookie for client-side middleware
   setCookie(event, DASHBOARD_LOGGED_IN_COOKIE, "1", getDashboardLoggedInCookieOptions());
 
-  return { success: true, email: data.email };
+  return { success: true, email };
 });

@@ -82,20 +82,24 @@ const loggingOut = ref(false);
 const { data: session, error: sessionError } = await useFetch<DashboardSession>("/api/dashboard/session");
 
 const baseNavigation = [
+  { label: "API Keys", icon: "i-material-symbols-light-key-outline", to: "/dashboard/keys" },
+  { label: "Documentation", icon: "i-material-symbols-light-menu-book-outline", to: "/dashboard/docs" },
+];
+const operatorNavigation = [
   { label: "Overview", icon: "i-material-symbols-light-dashboard-outline", to: "/dashboard", exact: true },
   { label: "Emails", icon: "i-material-symbols-light-mail-outline", to: "/dashboard/emails" },
   { label: "Queue", icon: "i-material-symbols-light-outbox-outline", to: "/dashboard/queue" },
-  { label: "Inbound", icon: "i-material-symbols-light-move-to-inbox-outline", to: "/dashboard/inbound" },
-  { label: "API Keys", icon: "i-material-symbols-light-key-outline", to: "/dashboard/keys" },
-  { label: "Listmonk", icon: "i-material-symbols-light-article-outline", to: "/dashboard/listmonk" },
 ];
 const adminNavigation = [
+  { label: "Inbound", icon: "i-material-symbols-light-move-to-inbox-outline", to: "/dashboard/inbound" },
+  { label: "Listmonk", icon: "i-material-symbols-light-article-outline", to: "/dashboard/listmonk" },
   { label: "Outbound", icon: "i-material-symbols-light-outgoing-mail", to: "/dashboard/outbound" },
   { label: "Integrations", icon: "i-material-symbols-light-hub-outline", to: "/dashboard/integrations" },
   { label: "System", icon: "i-material-symbols-light-dns-outline", to: "/dashboard/system" },
 ];
 const navigation = computed(() => {
   const items = [...baseNavigation];
+  if (["owner", "admin", "operator"].includes(session.value?.role || "")) items.unshift(...operatorNavigation);
   if (session.value?.role === "owner" || session.value?.role === "admin") items.push(...adminNavigation);
   if (session.value?.role === "owner") items.push({ label: "Access", icon: "i-material-symbols-light-admin-panel-settings-outline", to: "/dashboard/access" });
   return items;
@@ -116,8 +120,9 @@ const titles: Record<string, string> = {
   "/dashboard/access": "Access",
   "/dashboard/integrations": "Integrations",
   "/dashboard/system": "System",
+  "/dashboard/docs": "Documentation",
 };
-const pageTitle = computed(() => titles[route.path] || "Dashboard");
+const pageTitle = computed(() => route.path.startsWith("/dashboard/docs") ? "Documentation" : titles[route.path] || "Dashboard");
 
 async function logout() {
   loggingOut.value = true;

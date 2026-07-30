@@ -44,6 +44,10 @@ export function isAdminRole(role: DashboardRole | undefined): boolean {
   return role === "owner" || role === "admin";
 }
 
+export function isOperatorRole(role: DashboardRole | undefined): boolean {
+  return isAdminRole(role) || role === "operator";
+}
+
 function isTableUnavailable(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   if ("code" in error && (error as { code?: string }).code === "42P01") return true;
@@ -134,6 +138,13 @@ export async function assertDashboardAdmin(event: H3Event): Promise<{ email: str
   const access = await getDashboardRole(email);
   if (!isAdminRole(access.role)) throw createError({ statusCode: 403, message: "Dashboard administrator access required" });
   return { email, role: access.role as "owner" | "admin", breakGlass: access.breakGlass };
+}
+
+export async function assertDashboardOperator(event: H3Event): Promise<{ email: string; role: "owner" | "admin" | "operator"; breakGlass: boolean }> {
+  const email = getDashboardEmail(event);
+  const access = await getDashboardRole(email);
+  if (!isOperatorRole(access.role)) throw createError({ statusCode: 403, message: "Dashboard operator access required" });
+  return { email, role: access.role as "owner" | "admin" | "operator", breakGlass: access.breakGlass };
 }
 
 export async function assertDashboardOwner(event: H3Event): Promise<{ email: string; breakGlass: boolean }> {
