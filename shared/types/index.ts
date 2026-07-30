@@ -66,3 +66,27 @@ export interface QueueStats {
   delayed: number;
   total: number;
 }
+
+export interface InboundEmailConfigView {
+  source: "environment" | "database";
+  editable: boolean;
+  enabled: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  hasPassword: boolean;
+  mailbox: string;
+  webhookUrl: string;
+  hasWebhookSecret: boolean;
+  pollIntervalSeconds: number;
+  status: {
+    uidValidity: string | null;
+    lastUid: number;
+    lastPollAt: string | null;
+    lastSuccessAt: string | null;
+    lastError: string | null;
+    pendingDeliveries: number;
+    failedDeliveries: number;
+  };
+}
