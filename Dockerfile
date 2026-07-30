@@ -11,9 +11,6 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-# Generate SQL migration files from schema
-RUN pnpm db:generate
-
 # ---- Production Stage ----
 FROM node:20-alpine AS production
 

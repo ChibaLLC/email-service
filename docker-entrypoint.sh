@@ -2,11 +2,13 @@
 set -e
 
 echo "🗄️  Running database migrations..."
-npx drizzle-kit migrate 2>&1 || {
+if ! npx drizzle-kit migrate; then
   echo "⚠️  Migration failed — database may not be ready. Retrying in 3s..."
   sleep 3
-  npx drizzle-kit migrate 2>&1 || echo "❌ Migration failed after retry. Starting server anyway."
-}
+  if ! npx drizzle-kit migrate; then
+    echo "❌ Migration failed after retry. Starting server anyway." >&2
+  fi
+fi
 
 echo "🚀 Starting server..."
 exec "$@"
