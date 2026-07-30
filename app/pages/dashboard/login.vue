@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-950 flex items-center justify-center">
     <div class="max-w-sm w-full rounded-xl bg-white/5 backdrop-blur ring-1 ring-gray-800 shadow-2xl p-6">
       <div class="text-center mb-6">
-        <UIcon name="i-material-symbols-light-dashboard-outline" class="w-10 h-10 text-lime-400 mx-auto" />
+        <Icon name="material-symbols-light:dashboard-outline" class="mx-auto size-10 text-lime-400" />
         <h1 class="text-xl font-bold text-white mt-2">Dashboard</h1>
         <p class="text-sm text-gray-400 mt-1">
           {{ step === "email" ? "Sign in with your company email" : `Enter the code sent to ${email}` }}

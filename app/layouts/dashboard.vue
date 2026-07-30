@@ -13,7 +13,7 @@
       <template #header="{ collapsed }">
         <NuxtLink to="/dashboard" class="flex min-w-0 items-center gap-3 font-semibold">
           <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-lime-400/10 ring-1 ring-lime-400/20">
-            <UIcon name="i-material-symbols-light-mail-outline" class="size-6 text-lime-400" />
+            <Icon name="material-symbols-light:mail-outline" class="size-6 text-lime-400" />
           </span>
           <span v-if="!collapsed" class="truncate">Email Service</span>
         </NuxtLink>
@@ -84,10 +84,10 @@ const { data: session, error: sessionError } = await useFetch<DashboardSession>(
 const baseNavigation = [
   { label: "Overview", icon: "i-material-symbols-light-dashboard-outline", to: "/dashboard", exact: true },
   { label: "Emails", icon: "i-material-symbols-light-mail-outline", to: "/dashboard/emails" },
-  { label: "Queue", icon: "i-material-symbols-light-queue-mail-outline", to: "/dashboard/queue" },
+  { label: "Queue", icon: "i-material-symbols-light-outbox-outline", to: "/dashboard/queue" },
   { label: "Inbound", icon: "i-material-symbols-light-move-to-inbox-outline", to: "/dashboard/inbound" },
   { label: "API Keys", icon: "i-material-symbols-light-key-outline", to: "/dashboard/keys" },
-  { label: "Listmonk", icon: "i-material-symbols-light-newsstand-outline", to: "/dashboard/listmonk" },
+  { label: "Listmonk", icon: "i-material-symbols-light-article-outline", to: "/dashboard/listmonk" },
 ];
 const adminNavigation = [
   { label: "Integrations", icon: "i-material-symbols-light-hub-outline", to: "/dashboard/integrations" },

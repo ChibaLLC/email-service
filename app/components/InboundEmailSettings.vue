@@ -4,7 +4,7 @@
       <div class="flex flex-col gap-4 border-b border-gray-800 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div class="flex items-center gap-2">
-            <UIcon name="i-material-symbols-light-move-to-inbox-outline" class="size-5 text-lime-400" />
+            <Icon name="material-symbols-light:move-to-inbox-outline" class="size-5 text-lime-400" />
             <h2 class="font-semibold">Mail accounts</h2>
             <UBadge color="neutral" variant="subtle">{{ config?.accounts.length || 0 }}</UBadge>
           </div>
@@ -83,7 +83,7 @@
     <section v-if="config" class="overflow-hidden rounded-xl bg-white/5 ring-1 ring-gray-800">
       <div class="flex flex-col gap-4 border-b border-gray-800 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div class="flex items-center gap-2"><UIcon name="i-material-symbols-light-webhook" class="size-5 text-lime-400" /><h2 class="font-semibold">Webhook destinations</h2><UBadge color="neutral" variant="subtle">{{ webhookForms.length }}</UBadge></div>
+          <div class="flex items-center gap-2"><Icon name="material-symbols-light:webhook" class="size-5 text-lime-400" /><h2 class="font-semibold">Webhook destinations</h2><UBadge color="neutral" variant="subtle">{{ webhookForms.length }}</UBadge></div>
           <p class="mt-1 text-sm text-gray-400">Every member can add private destinations. Owners and admins can moderate routing, but only the creator can see credentials or send tests.</p>
         </div>
         <UButton variant="soft" icon="i-material-symbols-light-add" :disabled="mailboxOptions.length === 0" @click="addWebhook">Add webhook</UButton>
@@ -122,7 +122,7 @@
 
     <section v-if="preview" class="overflow-hidden rounded-xl bg-gray-950 ring-1 ring-lime-500/30">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 p-5">
-        <div><div class="flex items-center gap-2"><UIcon name="i-material-symbols-light-data-object" class="size-5 text-lime-400" /><h2 class="font-semibold">Last test delivery</h2><UBadge :color="preview.status && preview.status >= 200 && preview.status < 300 ? 'success' : 'warning'" variant="subtle">{{ preview.status ? `HTTP ${preview.status}` : "Preview generated" }}</UBadge></div><p class="mt-1 text-sm text-gray-400">This is the exact signed request. Replay it in Postman or from your terminal.</p></div>
+        <div><div class="flex items-center gap-2"><Icon name="material-symbols-light:data-object" class="size-5 text-lime-400" /><h2 class="font-semibold">Last test delivery</h2><UBadge :color="preview.status && preview.status >= 200 && preview.status < 300 ? 'success' : 'warning'" variant="subtle">{{ preview.status ? `HTTP ${preview.status}` : "Preview generated" }}</UBadge></div><p class="mt-1 text-sm text-gray-400">This is the exact signed request. Replay it in Postman or from your terminal.</p></div>
         <UButton color="neutral" variant="soft" icon="i-material-symbols-light-close" @click="() => { preview = null; }">Close</UButton>
       </div>
       <div class="space-y-5 p-5">
