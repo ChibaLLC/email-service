@@ -22,11 +22,11 @@
     </div>
 
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <StatsCard label="Total Sent" :value="stats?.totals.sent ?? 0" icon="i-material-symbols-light-check-circle-outline" color="text-emerald-400" />
-      <StatsCard label="Failed" :value="stats?.totals.failed ?? 0" icon="i-material-symbols-light-error-outline" color="text-red-400" />
-      <StatsCard label="Queued" :value="stats?.totals.queued ?? 0" icon="i-material-symbols-light-schedule-outline" color="text-amber-400" />
-      <StatsCard label="Success Rate" :value="`${stats?.successRate ?? 100}%`" icon="i-material-symbols-light-trending-up" color="text-lime-400" />
-      <StatsCard label="Active Keys" :value="stats?.activeKeys ?? 0" icon="i-material-symbols-light-key-outline" color="text-sky-400" />
+      <StatsCard label="Total Sent" :value="stats?.totals.sent ?? 0" icon="material-symbols-light:check-circle-outline" color="text-emerald-400" />
+      <StatsCard label="Failed" :value="stats?.totals.failed ?? 0" icon="material-symbols-light:error-outline" color="text-red-400" />
+      <StatsCard label="Queued" :value="stats?.totals.queued ?? 0" icon="material-symbols-light:schedule-outline" color="text-amber-400" />
+      <StatsCard label="Success Rate" :value="`${stats?.successRate ?? 100}%`" icon="material-symbols-light:trending-up" color="text-lime-400" />
+      <StatsCard label="Active Keys" :value="stats?.activeKeys ?? 0" icon="material-symbols-light:key-outline" color="text-sky-400" />
     </div>
 
     <div class="grid gap-4 lg:grid-cols-3">

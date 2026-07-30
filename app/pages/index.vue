@@ -8,7 +8,7 @@
         <div class="max-w-3xl mx-auto space-y-6">
           <!-- Header -->
           <div class="text-center mb-8">
-            <UIcon name="i-material-symbols-light-check-circle-outline" class="w-12 h-12 text-lime-400 mx-auto" />
+            <Icon name="material-symbols-light:check-circle-outline" class="mx-auto size-12 text-lime-400" />
             <h1 class="text-2xl font-bold text-white mt-3">API Key Sent!</h1>
             <p class="text-gray-400 mt-1">Check your email. Below is your API reference.</p>
           </div>
@@ -138,8 +138,8 @@
           <div class="px-4 py-5 sm:p-6">
             <div class="text-center">
               <div class="pointer-events-none">
-                <UIcon
-                  name="i-material-symbols-light-mail-outline"
+                <Icon
+                  name="material-symbols-light:mail-outline"
                   class="w-8 h-8 shrink-0 text-gray-900 dark:text-white"
                 />
               </div>

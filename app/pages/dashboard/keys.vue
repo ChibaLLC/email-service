@@ -25,7 +25,7 @@
         </div>
       </div>
       <div v-else class="py-16 text-center text-gray-500">
-        <UIcon name="i-material-symbols-light-key-off-outline" class="mx-auto mb-2 size-10 opacity-50" />
+        <Icon name="material-symbols-light:key-off-outline" class="mx-auto mb-2 size-10 opacity-50" />
         <p>No API keys found</p>
       </div>
     </section>

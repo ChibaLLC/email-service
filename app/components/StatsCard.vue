@@ -1,7 +1,7 @@
 <template>
   <div class="rounded-xl bg-white/5 ring-1 ring-gray-800 p-4 flex items-center gap-4">
     <div class="rounded-lg bg-white/5 p-3">
-      <UIcon :name="icon" :class="['w-6 h-6', color]" />
+      <Icon :name="icon" :class="['size-6', color]" />
     </div>
     <div>
       <div class="text-2xl font-bold text-white">{{ value }}</div>

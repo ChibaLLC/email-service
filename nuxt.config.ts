@@ -4,6 +4,11 @@ import vue from "@vitejs/plugin-vue";
 export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@nuxt/ui", "nuxt-echarts"],
+  icon: {
+    clientBundle: {
+      scan: true,
+    },
+  },
   compatibilityDate: "2025-02-04",
   telemetry: {
     enabled: false,

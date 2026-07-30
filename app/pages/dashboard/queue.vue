@@ -9,11 +9,11 @@
     </div>
 
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <StatsCard label="Waiting" :value="queue?.waiting ?? 0" icon="i-material-symbols-light-hourglass-empty" color="text-amber-400" />
-      <StatsCard label="Active" :value="queue?.active ?? 0" icon="i-material-symbols-light-play-circle-outline" color="text-sky-400" />
-      <StatsCard label="Delayed" :value="queue?.delayed ?? 0" icon="i-material-symbols-light-schedule-outline" color="text-violet-400" />
-      <StatsCard label="Completed" :value="queue?.completed ?? 0" icon="i-material-symbols-light-check-circle-outline" color="text-emerald-400" />
-      <StatsCard label="Failed" :value="queue?.failed ?? 0" icon="i-material-symbols-light-error-outline" color="text-red-400" />
+      <StatsCard label="Waiting" :value="queue?.waiting ?? 0" icon="material-symbols-light:hourglass-empty" color="text-amber-400" />
+      <StatsCard label="Active" :value="queue?.active ?? 0" icon="material-symbols-light:play-circle-outline" color="text-sky-400" />
+      <StatsCard label="Delayed" :value="queue?.delayed ?? 0" icon="material-symbols-light:schedule-outline" color="text-violet-400" />
+      <StatsCard label="Completed" :value="queue?.completed ?? 0" icon="material-symbols-light:check-circle-outline" color="text-emerald-400" />
+      <StatsCard label="Failed" :value="queue?.failed ?? 0" icon="material-symbols-light:error-outline" color="text-red-400" />
     </div>
 
     <section class="grid gap-6 rounded-xl bg-white/5 p-5 ring-1 ring-gray-800 md:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
