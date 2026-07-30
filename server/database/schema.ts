@@ -61,6 +61,20 @@ export const inboundConfig = pgTable("inbound_config", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const inboundWebhooks = pgTable(
+  "inbound_webhooks",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    secretEncrypted: text("secret_encrypted").notNull(),
+    senderFilters: text("sender_filters").array().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("inbound_webhooks_created_at_idx").on(table.createdAt)],
+);
+
 export const inboundRuntimeState = pgTable("inbound_runtime_state", {
   id: varchar("id", { length: 32 }).primaryKey(),
   accountFingerprint: text("account_fingerprint"),
@@ -110,6 +124,10 @@ export const inboundWebhookDeliveries = pgTable(
     messageId: text("message_id")
       .notNull()
       .references(() => inboundMessages.id, { onDelete: "cascade" }),
+    webhookId: text("webhook_id"),
+    webhookName: text("webhook_name"),
+    webhookUrl: text("webhook_url"),
+    webhookSecretEncrypted: text("webhook_secret_encrypted"),
     status: inboundDeliveryStatusEnum("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
@@ -120,7 +138,7 @@ export const inboundWebhookDeliveries = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("inbound_webhook_deliveries_message_unique").on(table.messageId),
+    uniqueIndex("inbound_webhook_deliveries_message_webhook_unique").on(table.messageId, table.webhookId),
     index("inbound_webhook_deliveries_due_idx").on(table.status, table.nextAttemptAt),
   ],
 );

@@ -76,7 +76,7 @@ openssl rand -base64 32
 openssl rand -hex 32
 ```
 
-Configure the mailbox and webhook in `/dashboard`. Usernames, passwords, and webhook secrets are encrypted at rest with `INBOUND_CONFIG_ENCRYPTION_KEY`. Inbound settings and connection tests require an authenticated dashboard user whose exact address appears in `DASHBOARD_ADMIN_EMAILS`; the broader domain login policy does not grant access.
+Configure the mailbox and one or more webhook destinations in `/dashboard`. Each destination has its own signing secret and optional sender filters. A filter may be an exact address (for example, `calendar-notification@google.com`) or an entire sender domain (for example, `@gmail.com`); an empty filter list accepts every sender. Usernames, passwords, and webhook secrets are encrypted at rest with `INBOUND_CONFIG_ENCRYPTION_KEY`. Inbound settings and connection tests require an authenticated dashboard user whose exact address appears in `DASHBOARD_ADMIN_EMAILS`; the broader domain login policy does not grant access. A saved destination can be tested from the dashboard, which sends a signed `email.received.test` event without accessing the mailbox.
 
 Webhook requests include these headers:
 
