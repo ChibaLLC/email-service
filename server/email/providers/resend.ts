@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { getDefaultFromAddress, parseEmailProviderConfig, type ResendConfig } from "../config";
+import { getDefaultFromAddress, type ResendConfig } from "../config";
 import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "../types";
 
 function mapAttachment(attachment: EmailAttachment) {
@@ -16,8 +16,8 @@ export class ResendProvider implements EmailProvider {
   private client: Resend;
   private config: ResendConfig;
 
-  constructor() {
-    this.config = parseEmailProviderConfig("resend");
+  constructor(config: ResendConfig) {
+    this.config = config;
     this.client = new Resend(this.config.RESEND_API_KEY);
   }
 
@@ -51,6 +51,15 @@ export class ResendProvider implements EmailProvider {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    }
+  }
+
+  async verify(): Promise<boolean> {
+    try {
+      await this.client.domains.list();
+      return true;
+    } catch {
+      return false;
     }
   }
 }

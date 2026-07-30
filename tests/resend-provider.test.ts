@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockResendConstructor = vi.fn();
 const mockSend = vi.fn();
+const config = { EMAIL_PROVIDER: "resend" as const, DEFAULT_FROM: "team@ifkafin.com", RESEND_API_KEY: "re_test_key" };
 
 vi.mock("resend", () => ({
   Resend: class {
@@ -30,14 +31,6 @@ describe("ResendProvider", () => {
     process.env = { ...originalEnv };
   });
 
-  it("throws when RESEND_API_KEY is missing", async () => {
-    delete process.env.RESEND_API_KEY;
-
-    const { ResendProvider } = await import("../server/email/providers/resend");
-
-    expect(() => new ResendProvider()).toThrow(/RESEND_API_KEY is required/);
-  });
-
   it("sends email with mapped attachments and default from address", async () => {
     process.env.RESEND_API_KEY = "re_test_key";
     process.env.DEFAULT_FROM = "team@ifkafin.com";
@@ -47,7 +40,7 @@ describe("ResendProvider", () => {
     });
 
     const { ResendProvider } = await import("../server/email/providers/resend");
-    const provider = new ResendProvider();
+    const provider = new ResendProvider(config);
 
     const result = await provider.send({
       to: ["allan.bosire@ifkafin.com"],
@@ -91,7 +84,7 @@ describe("ResendProvider", () => {
     });
 
     const { ResendProvider } = await import("../server/email/providers/resend");
-    const provider = new ResendProvider();
+    const provider = new ResendProvider({ ...config, DEFAULT_FROM: undefined });
 
     await provider.send({
       to: "allan.bosire@ifkafin.com",
@@ -115,7 +108,7 @@ describe("ResendProvider", () => {
     });
 
     const { ResendProvider } = await import("../server/email/providers/resend");
-    const provider = new ResendProvider();
+    const provider = new ResendProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",
@@ -135,7 +128,7 @@ describe("ResendProvider", () => {
     mockSend.mockRejectedValue(new Error("network timeout"));
 
     const { ResendProvider } = await import("../server/email/providers/resend");
-    const provider = new ResendProvider();
+    const provider = new ResendProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",

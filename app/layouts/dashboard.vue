@@ -90,6 +90,7 @@ const baseNavigation = [
   { label: "Listmonk", icon: "i-material-symbols-light-article-outline", to: "/dashboard/listmonk" },
 ];
 const adminNavigation = [
+  { label: "Outbound", icon: "i-material-symbols-light-outgoing-mail", to: "/dashboard/outbound" },
   { label: "Integrations", icon: "i-material-symbols-light-hub-outline", to: "/dashboard/integrations" },
   { label: "System", icon: "i-material-symbols-light-dns-outline", to: "/dashboard/system" },
 ];
@@ -111,6 +112,7 @@ const titles: Record<string, string> = {
   "/dashboard/inbound": "Inbound",
   "/dashboard/keys": "API Keys",
   "/dashboard/listmonk": "Listmonk",
+  "/dashboard/outbound": "Outbound",
   "/dashboard/access": "Access",
   "/dashboard/integrations": "Integrations",
   "/dashboard/system": "System",

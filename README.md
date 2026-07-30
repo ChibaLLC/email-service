@@ -128,19 +128,13 @@ curl -X POST http://localhost:3000/send \
 
 1. Create `server/email/providers/your-provider.ts` implementing `EmailProvider`
 2. Add the case in `server/email/providers/index.ts`
-3. Set `EMAIL_PROVIDER=your-provider` in `.env`
+3. Add its validated dashboard settings shape and encrypted secret mapping
 
 ## Using Resend
 
-Update `.env` to use Resend:
+Select Resend in `/dashboard/outbound`, then enter the API key and optional default sender:
 
-```bash
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=re_xxxxxxxxx
-DEFAULT_FROM=onboarding@resend.dev
-```
-
-Replace `re_xxxxxxxxx` with your real Resend API key before starting the app. If you move off the Resend test sender, verify your own sending domain in Resend and set `DEFAULT_FROM` to that address.
+If you move off the Resend test sender, verify your own sending domain in Resend and set the dashboard default sender to that address.
 
 Equivalent Resend SDK example:
 
@@ -159,15 +153,7 @@ await resend.emails.send({
 
 ## Using SendGrid
 
-Update `.env` to use SendGrid:
-
-```bash
-EMAIL_PROVIDER=sendgrid
-SENDGRID_API_KEY=SG.xxxxxxxx
-DEFAULT_FROM=verified-sender@example.com
-```
-
-Replace `SG.xxxxxxxx` with your real SendGrid API key before starting the app. `DEFAULT_FROM` must be a verified sender or a verified domain in SendGrid.
+Select SendGrid in `/dashboard/outbound` and enter its API key and default sender. The sender must be verified in SendGrid.
 
 Equivalent SendGrid SDK example:
 
@@ -186,15 +172,7 @@ await sgMail.send({
 
 ## Using Mailchimp Transactional
 
-Update `.env` to use Mailchimp Transactional:
-
-```bash
-EMAIL_PROVIDER=mailchimp
-MAILCHIMP_TRANSACTIONAL_API_KEY=your-mailchimp-transactional-api-key
-DEFAULT_FROM=verified-sender@example.com
-```
-
-Replace `your-mailchimp-transactional-api-key` with your real Mailchimp Transactional API key before starting the app. `DEFAULT_FROM` must be a sender that your Mailchimp Transactional account is allowed to send from.
+Select Mailchimp in `/dashboard/outbound` and enter its Transactional API key and an authorized default sender.
 
 Equivalent Mailchimp Transactional SDK example:
 
@@ -217,14 +195,7 @@ await mailchimp.messages.send({
 
 Postal setup is documented in detail in [docs/postal/README.md](docs/postal/README.md).
 
-Minimum app configuration:
-
-```bash
-EMAIL_PROVIDER=postal
-POSTAL_API_URL=http://postal-web:5000
-POSTAL_SERVER_API_KEY=postal_server_api_key
-DEFAULT_FROM=verified-sender@example.com
-```
+Configure Postal's API URL, server API key, and sender in `/dashboard/outbound`.
 
 For the bundled Postal Docker overlay, the Postal web container now explicitly allowlists the internal Docker host `postal-web:5000` for Rails host authorization. That is required because the app talks to Postal over the internal service URL while Postal itself may still advertise a different public `POSTAL_WEB_HOSTNAME` for browser access.
 
@@ -244,7 +215,7 @@ docker compose -f docker-compose.yml -f docker-compose.postal.yml exec postal-we
 
 Use the email and password you enter in that prompt to sign in to the Postal UI.
 
-If you are running the app outside Docker, replace `POSTAL_API_URL` with your Traefik hostname or another externally reachable Postal URL.
+If you are running the app outside Docker, use your Traefik hostname or another externally reachable Postal URL in the dashboard.
 
 Use the dedicated guide for the full Postal bootstrapping flow, DNS records, Postal UI setup, and delivery requirements.
 
@@ -274,16 +245,7 @@ The alternative **Twake Mail (`tmail-web`)** is also available in the Stalwart c
 ### CORS Configuration
 If you run the webmail client on a custom port or domain, you must configure CORS origins in your `.env` via `STALWART_HTTP_CORS_ALLOWED_ORIGINS`.
 
-Minimum app configuration:
-
-```bash
-EMAIL_PROVIDER=nodemailer
-SMTP_HOST=stalwart
-SMTP_PORT=587
-SMTP_USER=your-stalwart-account@example.com
-SMTP_PASS=your-stalwart-password
-DEFAULT_FROM=your-stalwart-account@example.com
-```
+Select SMTP in `/dashboard/outbound` and enter the Stalwart hostname, port, account, password, and default sender.
 
 For the consolidated production stack:
 
@@ -291,7 +253,7 @@ For the consolidated production stack:
 docker compose -f ./docker-compose.prod.yml --env-file .env up
 ```
 
-That compose file includes the base app services plus Postal, Listmonk, and Stalwart. If you keep both Postal and Stalwart enabled, point the app at the service you actually want to send through by setting `EMAIL_PROVIDER` and the matching SMTP or API credentials in `.env`.
+That compose file includes the base app services plus Postal, Listmonk, and Stalwart. If you keep both Postal and Stalwart enabled, select the service the app should use in `/dashboard/outbound`.
 
 Important: some VPS/cloud providers filter or block inbound SMTP on port `25` at the network edge. If external checkers show connection timeouts even though local tests look good, verify provider firewall policy and request SMTP `25` unblocking before assuming a Stalwart configuration issue.
 
@@ -301,9 +263,9 @@ Use the dedicated guide for first login, storage topology, coexistence with Post
 
 See [docs/stalwart/README.md](docs/stalwart/README.md).
 
-## Startup Validation
+## Outbound Provider Settings
 
-The server validates the selected email provider configuration during Nitro startup. If the selected provider is missing required environment variables, startup fails with a provider-specific error message that lists the missing or invalid keys.
+Outbound provider selection, sender details, SMTP credentials, and provider API keys are database-only settings managed in `/dashboard/outbound`. Secrets are encrypted with `SETTINGS_ENCRYPTION_KEY` and never returned to the browser. Each save creates an immutable revision; new messages use the active revision while queued retries remain pinned to the revision with which they were created. The server remains available for initial dashboard configuration when no provider is active, but sending and OTP login are unavailable until an owner or administrator activates one.
 
 ## Dashboard Test Email
 

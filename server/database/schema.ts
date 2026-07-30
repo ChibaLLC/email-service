@@ -19,6 +19,25 @@ export const emailStatusEnum = pgEnum("email_status", ["queued", "sending", "sen
 export const inboundDeliveryStatusEnum = pgEnum("inbound_delivery_status", ["pending", "delivered", "failed"]);
 export const dashboardMemberRoleEnum = pgEnum("dashboard_member_role", ["owner", "admin", "operator", "viewer"]);
 
+export const outboundSettings = pgTable(
+  "outbound_settings",
+  {
+    id: text("id").primaryKey().$defaultFn(() => ulid()),
+    version: integer("version").notNull(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().notNull(),
+    secretsEncrypted: jsonb("secrets_encrypted").$type<Record<string, string>>().notNull(),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("outbound_settings_version_unique").on(table.version),
+    uniqueIndex("outbound_settings_one_active_unique").on(table.active).where(sql`${table.active} = true`),
+    check("outbound_settings_provider_check", sql`${table.provider} IN ('nodemailer', 'resend', 'sendgrid', 'mailchimp', 'postal')`),
+  ],
+);
+
 export const apiKeys = pgTable("api_keys", {
   id: text("id")
     .primaryKey()
@@ -37,6 +56,7 @@ export const emails = pgTable("emails", {
     .primaryKey()
     .$defaultFn(() => ulid()),
   apiKeyId: text("api_key_id").references(() => apiKeys.id),
+  outboundSettingsId: text("outbound_settings_id").references(() => outboundSettings.id, { onDelete: "restrict" }),
   from: text("from").notNull(),
   to: text("to").notNull(),
   subject: text("subject").notNull(),

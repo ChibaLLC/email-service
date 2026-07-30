@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFetch = vi.fn();
+const config = { EMAIL_PROVIDER: "postal" as const, DEFAULT_FROM: "team@ifkafin.com", POSTAL_API_URL: "http://postal.test", POSTAL_SERVER_API_KEY: "postal_test_key" };
 
 describe("PostalProvider", () => {
   const originalEnv = { ...process.env };
@@ -27,14 +28,6 @@ describe("PostalProvider", () => {
     }
   });
 
-  it("throws when POSTAL_SERVER_API_KEY is missing", async () => {
-    delete process.env.POSTAL_SERVER_API_KEY;
-
-    const { PostalProvider } = await import("../server/email/providers/postal");
-
-    expect(() => new PostalProvider()).toThrow(/POSTAL_SERVER_API_KEY is required/);
-  });
-
   it("sends email with mapped attachments and default from address", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -49,7 +42,7 @@ describe("PostalProvider", () => {
     });
 
     const { PostalProvider } = await import("../server/email/providers/postal");
-    const provider = new PostalProvider();
+    const provider = new PostalProvider(config);
 
     const result = await provider.send({
       to: ["allan.bosire@ifkafin.com"],
@@ -103,7 +96,7 @@ describe("PostalProvider", () => {
     });
 
     const { PostalProvider } = await import("../server/email/providers/postal");
-    const provider = new PostalProvider();
+    const provider = new PostalProvider({ ...config, POSTAL_API_URL: "http://postal.test/api/v1" });
 
     await provider.send({
       to: "allan.bosire@ifkafin.com",
@@ -142,7 +135,7 @@ describe("PostalProvider", () => {
     });
 
     const { PostalProvider } = await import("../server/email/providers/postal");
-    const provider = new PostalProvider();
+    const provider = new PostalProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",
@@ -161,7 +154,7 @@ describe("PostalProvider", () => {
     mockFetch.mockRejectedValue(new Error("network timeout"));
 
     const { PostalProvider } = await import("../server/email/providers/postal");
-    const provider = new PostalProvider();
+    const provider = new PostalProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",

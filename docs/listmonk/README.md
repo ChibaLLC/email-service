@@ -74,7 +74,7 @@ Notes:
 - If the app is outside Docker, use your Traefik hostname or another reachable Listmonk URL instead
 - `LISTMONK_USERNAME` and `LISTMONK_PASSWORD` are the API user's BasicAuth credentials
 
-The app does not use Listmonk as an `EMAIL_PROVIDER`. Instead, it exposes a server-side proxy for authenticated dashboard traffic:
+The app does not use Listmonk as an outbound delivery provider. Instead, it exposes a server-side proxy for authenticated dashboard traffic:
 
 ```text
 /api/dashboard/listmonk/** -> LISTMONK_API_URL/api/**
@@ -110,7 +110,7 @@ Because the route sits under `/api/dashboard`, it is already covered by the dash
 
 ## Important Constraint
 
-Listmonk remains a mailing-list and campaign system. It is not part of the app's `EMAIL_PROVIDER` selection. The actual mail provider for this app is still controlled by `EMAIL_PROVIDER`, such as Postal, SendGrid, Resend, Mailchimp, or Nodemailer.
+Listmonk remains a mailing-list and campaign system. It is not part of the app's outbound provider selection. Configure Postal, SendGrid, Resend, Mailchimp, or SMTP from the dashboard's **Outbound email** page.
 
 ## Running Everything Locally
 

@@ -1,8 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { getDefaultFromAddress, parseEmailProviderConfig, type PostalConfig } from "../config";
+import { getDefaultFromAddress, type PostalConfig } from "../config";
 import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "../types";
-import type { FetchError } from "ofetch";
-import { consola } from "consola";
 
 type PostalResponse = {
   status?: string;
@@ -15,7 +13,6 @@ type PostalResponse = {
   message?: string;
   error?: string;
 };
-const console = consola.withTag("PostalProvider");
 function getSendEndpoint(apiUrl: string): string {
   const trimmed = apiUrl.replace(/\/+$/, "");
 
@@ -79,8 +76,8 @@ export class PostalProvider implements EmailProvider {
   private config: PostalConfig;
   private sendEndpoint: string;
 
-  constructor() {
-    this.config = parseEmailProviderConfig("postal");
+  constructor(config: PostalConfig) {
+    this.config = config;
     this.sendEndpoint = getSendEndpoint(this.config.POSTAL_API_URL);
   }
 
@@ -90,29 +87,25 @@ export class PostalProvider implements EmailProvider {
         ? await Promise.all(message.attachments.map((attachment) => mapAttachment(attachment)))
         : undefined;
 
-      const payload = await $fetch<PostalResponse>(this.sendEndpoint, {
+      const response = await fetch(this.sendEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Server-API-Key": this.config.POSTAL_SERVER_API_KEY,
         },
-        body: {
+        body: JSON.stringify({
           from: message.from || getDefaultFromAddress(this.config),
           to: Array.isArray(message.to) ? message.to : [message.to],
           subject: message.subject,
           ...(message.text ? { plain_body: message.text } : {}),
           ...(message.html ? { html_body: message.html } : {}),
           ...(attachments?.length ? { attachments } : {}),
-        },
-      }).catch((error) => {
-        const {message, response} = error as FetchError;
-        const errorMessage = response ? getErrorMessage(response._data as PostalResponse, response) : message || String(error);
-        throw new Error(`Postal API request failed: ${errorMessage}`);
+        }),
       });
+      const payload = await response.json().catch(() => null) as PostalResponse | null;
 
-      if(payload.status !== "success") {
-        const errorMessage = getErrorMessage(payload, new Response("", { status: 500, statusText: "Internal Server Error" }));
-        throw new Error(`Postal API responded with error: ${errorMessage}`);
+      if (!response.ok || payload?.status !== "success") {
+        throw new Error(getErrorMessage(payload, response));
       }
 
       return {
@@ -124,6 +117,19 @@ export class PostalProvider implements EmailProvider {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    }
+  }
+
+  async verify(): Promise<boolean> {
+    try {
+      const response = await fetch(this.sendEndpoint, {
+        method: "OPTIONS",
+        headers: { "X-Server-API-Key": this.config.POSTAL_SERVER_API_KEY },
+        signal: AbortSignal.timeout(10_000),
+      });
+      return response.status !== 401 && response.status !== 403;
+    } catch {
+      return false;
     }
   }
 }
