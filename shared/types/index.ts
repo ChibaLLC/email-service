@@ -69,28 +69,42 @@ export interface QueueStats {
 
 export interface InboundEmailConfigView {
   source: "database";
-  editable: boolean;
-  enabled: boolean;
-  host: string;
-  port: number;
-  secure: boolean;
-  username: string;
-  hasPassword: boolean;
-  mailbox: string;
+  canManageAccounts: boolean;
+  accounts: {
+    id: string;
+    name: string;
+    enabled?: boolean;
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    username?: string;
+    hasPassword?: boolean;
+    pollIntervalSeconds?: number;
+    mailboxes: { id: string; name: string; path?: string; enabled?: boolean }[];
+  }[];
   webhooks: {
     id: string;
     name: string;
-    url: string;
+    ownerEmail: string;
+    owned: boolean;
+    canManage: boolean;
+    url?: string;
     hasSecret: boolean;
     senderFilters: string[];
+    mailboxIds: string[];
   }[];
-  pollIntervalSeconds: number;
   status: {
-    uidValidity: string | null;
-    lastUid: number;
-    lastPollAt: string | null;
-    lastSuccessAt: string | null;
-    lastError: string | null;
+    mailboxes: {
+      accountId: string;
+      accountName: string;
+      mailboxId: string;
+      mailboxName: string;
+      uidValidity: string | null;
+      lastUid: number;
+      lastPollAt: string | null;
+      lastSuccessAt: string | null;
+      lastError: string | null;
+    }[];
     pendingDeliveries: number;
     failedDeliveries: number;
   };

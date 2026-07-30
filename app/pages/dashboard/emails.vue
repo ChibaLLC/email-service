@@ -21,8 +21,8 @@
       <div class="flex items-center justify-between border-t border-gray-800 px-4 py-3">
         <p class="text-sm text-gray-500">Showing {{ offset + 1 }}-{{ offset + emails.length }}</p>
         <div class="flex gap-2">
-          <UButton color="neutral" variant="ghost" icon="i-material-symbols-light-chevron-left" :disabled="page === 1" @click="page--">Previous</UButton>
-          <UButton color="neutral" variant="ghost" trailing-icon="i-material-symbols-light-chevron-right" :disabled="emails.length < pageSize" @click="page++">Next</UButton>
+          <UButton color="neutral" variant="ghost" icon="i-material-symbols-light-chevron-left" :disabled="page === 1" @click="() => { page--; }">Previous</UButton>
+          <UButton color="neutral" variant="ghost" trailing-icon="i-material-symbols-light-chevron-right" :disabled="emails.length < pageSize" @click="() => { page++; }">Next</UButton>
         </div>
       </div>
     </section>
@@ -57,6 +57,9 @@ const columns: TableColumn<EmailRecord>[] = [
 
 function formatDate(value: string | null) { return value ? new Date(value).toLocaleString() : "-"; }
 function statusColor(status: EmailRecord["status"]): "success" | "error" | "warning" | "info" {
-  return { sent: "success", failed: "error", queued: "warning", sending: "info" }[status];
+  if (status === "sent") return "success";
+  if (status === "failed") return "error";
+  if (status === "queued") return "warning";
+  return "info";
 }
 </script>

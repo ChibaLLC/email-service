@@ -6,14 +6,15 @@ import { and, asc, count, countDistinct, eq, isNotNull, isNull, lt, lte, notExis
 import { consola } from "consola";
 import { ulid } from "ulid";
 import { db, pool, schema } from "../database";
-import { getInboundConfig, getInboundEncryptionKey } from "./config";
+import { getInboundAccount, getInboundAccounts, getInboundEncryptionKey, INBOUND_CONFIG_LOCK_NAME } from "./config";
 import { createWebhookSignature, decryptInboundValue, encryptInboundValue } from "./crypto";
 import { assertSafeWebhookDestination } from "./network";
 import { matchesSenderFilters } from "./filters";
-import type { InboundConfig, InboundWebhookPayload } from "./types";
+import type { InboundAccountConfig, InboundMailboxConfig, InboundWebhookPayload } from "./types";
+import { buildInboundWebhookPreview } from "./webhook-preview";
+import { parseCalendarReply } from "./calendar-reply";
 
-const STATE_ID = "primary";
-const ADVISORY_LOCK_NAME = "email-service:inbound:primary";
+const ADVISORY_LOCK_NAME = "email-service:inbound";
 const MAX_RAW_SIZE = 1_000_000;
 const FETCH_BATCH_SIZE = 25;
 const MAX_PENDING_MESSAGES = 250;
@@ -21,13 +22,13 @@ const RAW_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
 const METADATA_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 const logger = consola.withTag("inbound-email");
 
-function accountFingerprint(config: InboundConfig): string {
+function accountFingerprint(config: InboundAccountConfig, mailboxPath: string): string {
   return createHash("sha256")
-    .update([config.host.toLowerCase(), config.port, config.username, config.mailbox].join("\0"))
+    .update([config.host.toLowerCase(), config.port, config.username, mailboxPath].join("\0"))
     .digest("hex");
 }
 
-function createClient(config: InboundConfig): ImapFlow {
+function createClient(config: InboundAccountConfig): ImapFlow {
   return new ImapFlow({
     host: config.host,
     port: config.port,
@@ -44,21 +45,26 @@ function createClient(config: InboundConfig): ImapFlow {
   });
 }
 
-export async function verifyInboundConnection(input?: InboundConfig | null) {
-  const config = input ?? (await getInboundConfig());
-  if (!config) throw new Error("Inbound email ingestion is disabled");
+export async function verifyInboundConnection(accountId: string) {
+  const config = await getInboundAccount(accountId);
+  if (!config) throw new Error("Inbound account was not found");
   const client = createClient(config);
   try {
     await client.connect();
-    const mailbox = await client.mailboxOpen(config.mailbox, { readOnly: true });
-    return { mailbox: mailbox.path, messages: mailbox.exists, uidNext: mailbox.uidNext };
+    const mailboxes: { id: string; path: string; messages: number; uidNext: number }[] = [];
+    for (const configured of config.mailboxes) {
+      const mailbox = await client.mailboxOpen(configured.path, { readOnly: true });
+      mailboxes.push({ id: configured.id, path: mailbox.path, messages: mailbox.exists, uidNext: mailbox.uidNext });
+    }
+    return { accountId: config.id, mailboxes };
   } finally {
     if (client.usable) await client.logout().catch(() => client.close());
   }
 }
 
 async function recordOversizedMessage(
-  config: InboundConfig,
+  config: InboundAccountConfig,
+  mailbox: InboundMailboxConfig,
   fingerprint: string,
   uidValidity: string,
   message: {
@@ -68,7 +74,7 @@ async function recordOversizedMessage(
     internalDate?: Date | string;
   },
 ) {
-  const webhooks = config.webhooks.filter((webhook) =>
+  const webhooks = mailbox.webhooks.filter((webhook) =>
     matchesSenderFilters(message.envelope?.from?.[0]?.address, webhook.senderFilters),
   );
   if (webhooks.length === 0) return;
@@ -79,7 +85,11 @@ async function recordOversizedMessage(
       .values({
         id: messageId,
         accountFingerprint: fingerprint,
-        mailbox: config.mailbox,
+        accountId: config.id,
+        accountName: config.name,
+        mailboxId: mailbox.id,
+        mailboxName: mailbox.name,
+        mailbox: mailbox.path,
         uidValidity,
         uid: message.uid,
         messageId: message.envelope?.messageId,
@@ -111,7 +121,7 @@ async function recordOversizedMessage(
   });
 }
 
-async function ingestMailbox(config: InboundConfig) {
+async function ingestMailbox(config: InboundAccountConfig, configuredMailbox: InboundMailboxConfig) {
   const [pending] = await db
     .select({ count: countDistinct(schema.inboundWebhookDeliveries.messageId) })
     .from(schema.inboundWebhookDeliveries)
@@ -121,19 +131,20 @@ async function ingestMailbox(config: InboundConfig) {
     throw new Error(`Inbound webhook backlog reached the ${MAX_PENDING_MESSAGES} message safety limit`);
   }
 
-  const fingerprint = accountFingerprint(config);
+  const fingerprint = accountFingerprint(config, configuredMailbox.path);
   const client = createClient(config);
-  await db.insert(schema.inboundRuntimeState).values({ id: STATE_ID }).onConflictDoNothing();
+  await db.insert(schema.inboundRuntimeState).values({ id: configuredMailbox.id }).onConflictDoNothing();
 
   try {
     await client.connect();
-    const mailbox = await client.mailboxOpen(config.mailbox, { readOnly: true });
+    const mailbox = await client.mailboxOpen(configuredMailbox.path, { readOnly: true });
     const uidValidity = mailbox.uidValidity.toString();
     const [state] = await db
       .select()
       .from(schema.inboundRuntimeState)
-      .where(eq(schema.inboundRuntimeState.id, STATE_ID))
+      .where(eq(schema.inboundRuntimeState.id, configuredMailbox.id))
       .limit(1);
+    if (!state) throw new Error("Could not initialize inbound mailbox cursor");
     const sourceChanged = state?.accountFingerprint !== fingerprint || state?.uidValidity !== uidValidity;
     if (sourceChanged) {
       await db
@@ -147,8 +158,8 @@ async function ingestMailbox(config: InboundConfig) {
           lastError: null,
           updatedAt: new Date(),
         })
-        .where(eq(schema.inboundRuntimeState.id, STATE_ID));
-      logger.info("Initialized mailbox cursor at current high-water mark");
+        .where(eq(schema.inboundRuntimeState.id, configuredMailbox.id));
+      logger.info(`Initialized mailbox cursor for ${config.name}/${configuredMailbox.name} at current high-water mark`);
       return;
     }
 
@@ -158,7 +169,7 @@ async function ingestMailbox(config: InboundConfig) {
       await db
         .update(schema.inboundRuntimeState)
         .set({ lastPollAt: new Date(), lastSuccessAt: new Date(), lastError: null, updatedAt: new Date() })
-        .where(eq(schema.inboundRuntimeState.id, STATE_ID));
+        .where(eq(schema.inboundRuntimeState.id, configuredMailbox.id));
       return;
     }
 
@@ -171,13 +182,13 @@ async function ingestMailbox(config: InboundConfig) {
       if (message.uid < firstUid || message.uid > finalUid) continue;
       const rawSize = message.size || message.source?.length || 0;
       if (!message.source || rawSize > MAX_RAW_SIZE || message.source.length > MAX_RAW_SIZE) {
-        await recordOversizedMessage(config, fingerprint, uidValidity, message);
+        await recordOversizedMessage(config, configuredMailbox, fingerprint, uidValidity, message);
         lastUid = Math.max(lastUid, message.uid);
         continue;
       }
 
       const sender = message.envelope?.from?.[0]?.address;
-      const webhooks = config.webhooks.filter((webhook) => matchesSenderFilters(sender, webhook.senderFilters));
+      const webhooks = configuredMailbox.webhooks.filter((webhook) => matchesSenderFilters(sender, webhook.senderFilters));
       if (webhooks.length === 0) {
         lastUid = Math.max(lastUid, message.uid);
         continue;
@@ -191,7 +202,11 @@ async function ingestMailbox(config: InboundConfig) {
           .values({
             id: inboundMessageId,
             accountFingerprint: fingerprint,
-            mailbox: config.mailbox,
+            accountId: config.id,
+            accountName: config.name,
+            mailboxId: configuredMailbox.id,
+            mailboxName: configuredMailbox.name,
+            mailbox: configuredMailbox.path,
             uidValidity,
             uid: message.uid,
             messageId: message.envelope?.messageId,
@@ -222,7 +237,7 @@ async function ingestMailbox(config: InboundConfig) {
     await db
       .update(schema.inboundRuntimeState)
       .set({ lastUid, lastPollAt: new Date(), lastSuccessAt: new Date(), lastError: null, updatedAt: new Date() })
-      .where(eq(schema.inboundRuntimeState.id, STATE_ID));
+      .where(eq(schema.inboundRuntimeState.id, configuredMailbox.id));
   } finally {
     if (client.usable) await client.logout().catch(() => client.close());
   }
@@ -264,31 +279,28 @@ async function postWebhook(
   });
 }
 
-export async function verifyInboundWebhook(webhookId: string) {
-  const config = await getInboundConfig();
-  if (!config) throw new Error("Inbound email ingestion is disabled");
-  const webhook = config.webhooks.find((candidate) => candidate.id === webhookId);
-  if (!webhook) throw new Error("Webhook destination was not found");
-  const timestamp = Math.floor(Date.now() / 1_000).toString();
-  const body = JSON.stringify({
-    type: "email.received.test",
-    version: 1,
-    webhook: webhook.name,
-    occurredAt: new Date().toISOString(),
-  });
-  const status = await postWebhook(
-    await assertSafeWebhookDestination(webhook.url),
-    {
-      "content-type": "application/json",
-      "content-length": String(Buffer.byteLength(body)),
-      "x-email-service-event": "email.received.test",
-      "x-email-service-timestamp": timestamp,
-      "x-email-service-signature": createWebhookSignature(webhook.secret, timestamp, body),
-    },
-    body,
-  );
-  if (status < 200 || status >= 300) throw new Error(`Webhook returned HTTP ${status}`);
-  return { status };
+export async function verifyInboundWebhook(
+  webhook: { name: string; url: string; secretEncrypted: string },
+  previewOnly = false,
+) {
+  const secret = decryptInboundValue(
+    webhook.secretEncrypted,
+    getInboundEncryptionKey(),
+    "inbound-config:webhook-secret",
+  ).toString();
+  const preview = buildInboundWebhookPreview(webhook, secret);
+  if (!previewOnly) {
+    try {
+      preview.status = await postWebhook(
+        await assertSafeWebhookDestination(webhook.url),
+        preview.headers,
+        preview.body,
+      );
+    } catch {
+      preview.status = null;
+    }
+  }
+  return preview;
 }
 
 async function deliverPending() {
@@ -321,11 +333,16 @@ async function deliverPending() {
           to: message.to,
           messageId: message.messageId,
           mailbox: message.mailbox,
+          accountId: message.accountId,
+          accountName: message.accountName,
+          mailboxId: message.mailboxId,
+          mailboxName: message.mailboxName,
           uidValidity: message.uidValidity,
           uid: message.uid,
           rawMimeBase64: raw.toString("base64"),
           rawSize: message.rawSize,
           receivedAt: message.receivedAt?.toISOString() || null,
+          calendarReply: parseCalendarReply(raw),
         },
       };
       const body = JSON.stringify(payload);
@@ -474,8 +491,8 @@ async function cleanupInboundHistory() {
     );
 }
 
-async function updateRuntimeError(error: unknown) {
-  await db.insert(schema.inboundRuntimeState).values({ id: STATE_ID }).onConflictDoNothing();
+async function updateRuntimeError(mailboxId: string, error: unknown) {
+  await db.insert(schema.inboundRuntimeState).values({ id: mailboxId }).onConflictDoNothing();
   await db
     .update(schema.inboundRuntimeState)
     .set({
@@ -483,18 +500,12 @@ async function updateRuntimeError(error: unknown) {
       lastError: error instanceof Error ? error.message.slice(0, 2_000) : "Unknown inbound email error",
       updatedAt: new Date(),
     })
-    .where(eq(schema.inboundRuntimeState.id, STATE_ID));
+    .where(eq(schema.inboundRuntimeState.id, mailboxId));
 }
 
 export async function runInboundCycle(): Promise<number> {
-  let config: InboundConfig | null = null;
-  let configError: unknown;
-  try {
-    config = await getInboundConfig();
-  } catch (error) {
-    logger.error("Invalid inbound email configuration", error);
-    configError = error;
-  }
+  let accounts: InboundAccountConfig[] = [];
+  let interval = 30;
 
   const lockClient = await pool.connect();
   try {
@@ -502,47 +513,76 @@ export async function runInboundCycle(): Promise<number> {
       "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
       [ADVISORY_LOCK_NAME],
     );
-    if (!lock.rows[0]?.acquired) return config?.pollIntervalSeconds || 30;
+    if (!lock.rows[0]?.acquired) return interval;
 
     try {
-      await cleanupInboundHistory();
-      if (configError) {
-        await updateRuntimeError(configError);
-        return 30;
+      await lockClient.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [INBOUND_CONFIG_LOCK_NAME]);
+      try {
+        accounts = await getInboundAccounts();
+        interval = accounts.length ? Math.min(...accounts.map((account) => account.pollIntervalSeconds)) : 30;
+      } catch (error) {
+        logger.error("Invalid inbound email configuration", error);
+        const mailboxes = await db.select({ id: schema.inboundMailboxes.id }).from(schema.inboundMailboxes);
+        for (const mailbox of mailboxes) await updateRuntimeError(mailbox.id, error);
       }
-      if (!config) return 30;
+      await cleanupInboundHistory();
       await deliverPending();
-      await ingestMailbox(config);
+      const states = await db.select().from(schema.inboundRuntimeState);
+      const lastPollByMailbox = new Map(states.map((state) => [state.id, state.lastPollAt]));
+      for (const account of accounts) {
+        for (const mailbox of account.mailboxes) {
+          const lastPollAt = lastPollByMailbox.get(mailbox.id);
+          if (lastPollAt && Date.now() - lastPollAt.getTime() < account.pollIntervalSeconds * 1_000) continue;
+          try {
+            await ingestMailbox(account, mailbox);
+          } catch (error) {
+            logger.error(`Inbound poll failed for ${account.name}/${mailbox.name}`, error);
+            await updateRuntimeError(mailbox.id, error);
+          }
+        }
+      }
       await deliverPending();
     } catch (error) {
       logger.error("Inbound email cycle failed", error);
-      await updateRuntimeError(error);
     } finally {
+      await lockClient.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [INBOUND_CONFIG_LOCK_NAME]);
       await lockClient.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [ADVISORY_LOCK_NAME]);
     }
   } finally {
     lockClient.release();
   }
-  return config?.pollIntervalSeconds || 30;
+  return interval;
 }
 
 export async function getInboundRuntimeStatus() {
-  const [state] = await db
-    .select()
+  const states = await db
+    .select({
+      state: schema.inboundRuntimeState,
+      mailboxId: schema.inboundMailboxes.id,
+      mailboxName: schema.inboundMailboxes.name,
+      accountId: schema.inboundAccounts.id,
+      accountName: schema.inboundAccounts.name,
+    })
     .from(schema.inboundRuntimeState)
-    .where(eq(schema.inboundRuntimeState.id, STATE_ID))
-    .limit(1);
+    .innerJoin(schema.inboundMailboxes, eq(schema.inboundRuntimeState.id, schema.inboundMailboxes.id))
+    .innerJoin(schema.inboundAccounts, eq(schema.inboundMailboxes.accountId, schema.inboundAccounts.id));
   const deliveryCounts = await db
     .select({ status: schema.inboundWebhookDeliveries.status, count: count() })
     .from(schema.inboundWebhookDeliveries)
     .groupBy(schema.inboundWebhookDeliveries.status);
   const counts = Object.fromEntries(deliveryCounts.map((row) => [row.status, Number(row.count)]));
   return {
-    uidValidity: state?.uidValidity || null,
-    lastUid: state?.lastUid || 0,
-    lastPollAt: state?.lastPollAt?.toISOString() || null,
-    lastSuccessAt: state?.lastSuccessAt?.toISOString() || null,
-    lastError: state?.lastError || null,
+    mailboxes: states.map(({ state, mailboxId, mailboxName, accountId, accountName }) => ({
+      accountId,
+      accountName,
+      mailboxId,
+      mailboxName,
+      uidValidity: state.uidValidity || null,
+      lastUid: state.lastUid || 0,
+      lastPollAt: state.lastPollAt?.toISOString() || null,
+      lastSuccessAt: state.lastSuccessAt?.toISOString() || null,
+      lastError: state.lastError || null,
+    })),
     pendingDeliveries: counts.pending || 0,
     failedDeliveries: counts.failed || 0,
   };

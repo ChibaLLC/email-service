@@ -67,9 +67,15 @@ export async function bootstrapDashboardAccess(): Promise<void> {
       apiKeyDomains: fallback.apiKeyDomains,
     }).onConflictDoNothing();
 
-    const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(schema.dashboardMembers);
-    if (count === 0 && fallback.owners.length) {
+    const [memberCount] = await tx.select({ count: sql<number>`count(*)::int` }).from(schema.dashboardMembers);
+    if ((memberCount?.count || 0) === 0 && fallback.owners.length) {
       await tx.insert(schema.dashboardMembers).values(fallback.owners.map((email) => ({ email, role: "owner" as const }))).onConflictDoNothing();
+    }
+    if (fallback.owners[0]) {
+      await tx
+        .update(schema.inboundWebhooks)
+        .set({ ownerEmail: fallback.owners[0], updatedAt: new Date() })
+        .where(eq(schema.inboundWebhooks.ownerEmail, "legacy@local.invalid"));
     }
   });
 }

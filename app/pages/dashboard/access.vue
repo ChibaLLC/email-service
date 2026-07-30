@@ -33,7 +33,7 @@
             <UFormField label="Role">
               <USelect v-model="member.role" :items="roles" class="w-full" />
             </UFormField>
-            <UButton type="button" color="error" variant="ghost" icon="i-material-symbols-light-delete-outline" aria-label="Remove member" @click="members.splice(index, 1)" />
+            <UButton type="button" color="error" variant="ghost" icon="i-material-symbols-light-delete-outline" aria-label="Remove member" @click="() => { members.splice(index, 1); }" />
           </div>
         </div>
         <div v-else class="p-8 text-center text-sm text-gray-500">No explicit members configured.</div>

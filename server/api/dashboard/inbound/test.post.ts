@@ -1,14 +1,5 @@
-import { verifyInboundConnection } from "../../../inbound/service";
-import { assertInboundDashboardAdmin } from "../../../inbound/admin";
+import { createError } from "h3";
 
 export default defineEventHandler(async (event) => {
-  await assertInboundDashboardAdmin(event);
-  try {
-    return await verifyInboundConnection();
-  } catch (error) {
-    throw createError({
-      statusCode: 502,
-      message: error instanceof Error ? error.message : "Could not connect to the IMAP mailbox",
-    });
-  }
+  throw createError({ statusCode: 410, message: "Use POST /api/dashboard/inbound/accounts/:id/test" });
 });

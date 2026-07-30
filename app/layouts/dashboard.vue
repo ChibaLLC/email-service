@@ -85,11 +85,11 @@ const baseNavigation = [
   { label: "Overview", icon: "i-material-symbols-light-dashboard-outline", to: "/dashboard", exact: true },
   { label: "Emails", icon: "i-material-symbols-light-mail-outline", to: "/dashboard/emails" },
   { label: "Queue", icon: "i-material-symbols-light-queue-mail-outline", to: "/dashboard/queue" },
+  { label: "Inbound", icon: "i-material-symbols-light-move-to-inbox-outline", to: "/dashboard/inbound" },
   { label: "API Keys", icon: "i-material-symbols-light-key-outline", to: "/dashboard/keys" },
   { label: "Listmonk", icon: "i-material-symbols-light-newsstand-outline", to: "/dashboard/listmonk" },
 ];
 const adminNavigation = [
-  { label: "Inbound", icon: "i-material-symbols-light-move-to-inbox-outline", to: "/dashboard/inbound" },
   { label: "Integrations", icon: "i-material-symbols-light-hub-outline", to: "/dashboard/integrations" },
   { label: "System", icon: "i-material-symbols-light-dns-outline", to: "/dashboard/system" },
 ];

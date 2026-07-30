@@ -1,69 +1,56 @@
-import { eq, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { env } from "std-env";
 import { ulid } from "ulid";
 import { z } from "zod";
 import { db, schema } from "../database";
 import { decryptInboundValue, encryptInboundValue, parseEncryptionKey } from "./crypto";
 import { normalizeSenderFilters } from "./filters";
-import type { InboundConfig, InboundConfigInput, InboundWebhook } from "./types";
+import type { InboundAccountConfig, InboundAccountInput, InboundWebhook } from "./types";
 
-const CONFIG_ID = "primary";
-const CONFIG_LOCK_NAME = "email-service:inbound-config:primary";
-const inboundWebhookInputSchema = z.object({
+export const INBOUND_CONFIG_LOCK_NAME = "email-service:inbound-config";
+
+const mailboxInputSchema = z.object({
   id: z.string().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(100),
-  url: z.string().trim().url().max(2048),
-  secret: z.string().min(32).max(4096).optional(),
-  senderFilters: z.array(z.string().trim().min(1).max(320)).max(100),
-});
-
-export const inboundConfigInputSchema = z.object({
+  path: z.string().trim().min(1).max(255),
   enabled: z.boolean(),
-  host: z.string().trim().max(255),
-  port: z.number().int().min(1).max(65535),
-  secure: z.boolean(),
-  username: z.string().trim().max(320),
-  password: z.string().max(4096).optional(),
-  mailbox: z.string().trim().min(1).max(255),
-  webhooks: z.array(inboundWebhookInputSchema).max(10),
-  pollIntervalSeconds: z.number().int().min(10).max(3600),
 });
 
-const configSchema = z.object({
-  enabled: z.literal(true),
+export const inboundAccountInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  enabled: z.boolean(),
   host: z.string().trim().min(1).max(255),
   port: z.number().int().min(1).max(65535),
   secure: z.boolean(),
   username: z.string().trim().min(1).max(320),
-  password: z.string().min(1).max(4096),
-  mailbox: z.string().trim().min(1).max(255),
-  webhooks: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().trim().min(1).max(100),
-        url: z.string().trim().url().max(2048),
-        secret: z.string().min(32).max(4096),
-        senderFilters: z.array(z.string().trim().min(1).max(320)).max(100),
-      }),
-    )
-    .min(1)
-    .max(10),
+  password: z.string().min(1).max(4096).optional(),
+  mailboxes: z.array(mailboxInputSchema).min(1).max(100),
   pollIntervalSeconds: z.number().int().min(10).max(3600),
+}).superRefine((value, context) => {
+  if (new Set(value.mailboxes.map((mailbox) => mailbox.name.toLowerCase())).size !== value.mailboxes.length) {
+    context.addIssue({ code: "custom", message: "Mailbox names must be unique" });
+  }
+  if (new Set(value.mailboxes.map((mailbox) => mailbox.path)).size !== value.mailboxes.length) {
+    context.addIssue({ code: "custom", message: "Mailbox paths must be unique" });
+  }
 });
 
-function readBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined || value === "") return fallback;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  throw new Error(`Expected true or false, received ${value}`);
+export const inboundWebhookInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  url: z.string().trim().url().max(2048).optional(),
+  secret: z.string().min(32).max(4096).optional(),
+  mailboxIds: z.array(z.string().min(1).max(128)).min(1).max(100).transform((ids) => [...new Set(ids)]),
+  senderFilters: z.array(z.string().trim().min(1).max(320)).max(100).transform(normalizeSenderFilters),
+});
+
+function privateNetworksAllowed(): boolean {
+  return env.INBOUND_WEBHOOK_ALLOW_PRIVATE_NETWORKS === "true";
 }
 
 function validateWebhookUrl(value: string) {
   const url = new URL(value);
-  if (url.protocol !== "https:" && !readBoolean(env.INBOUND_WEBHOOK_ALLOW_PRIVATE_NETWORKS, false)) {
-    throw new Error("Inbound webhook URL must use HTTPS");
-  }
+  if (url.protocol !== "https:" && !privateNetworksAllowed()) throw new Error("Inbound webhook URL must use HTTPS");
+  if (url.username || url.password) throw new Error("Inbound webhook URL must not contain credentials");
 }
 
 export function getInboundEncryptionKey(): Buffer {
@@ -73,164 +60,222 @@ export function getInboundEncryptionKey(): Buffer {
   return parseEncryptionKey(env.INBOUND_CONFIG_ENCRYPTION_KEY);
 }
 
-export function validateInboundConfig(input: Omit<InboundConfig, "source">): Omit<InboundConfig, "source"> {
-  const config = configSchema.parse(input);
-  for (const webhook of config.webhooks) validateWebhookUrl(webhook.url);
-  return {
-    ...config,
-    webhooks: config.webhooks.map((webhook) => ({
-      ...webhook,
-      senderFilters: normalizeSenderFilters(webhook.senderFilters),
-    })),
-  };
-}
-
-async function readInboundConfigRows() {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${CONFIG_LOCK_NAME}, 0))`);
-    const [row] = await tx.select().from(schema.inboundConfig).where(eq(schema.inboundConfig.id, CONFIG_ID)).limit(1);
-    const webhooks = await tx.select().from(schema.inboundWebhooks).orderBy(schema.inboundWebhooks.createdAt);
-    return { row, webhooks };
-  });
-}
-
-export async function getInboundConfig(): Promise<InboundConfig | null> {
-  const { row, webhooks: rows } = await readInboundConfigRows();
-  if (!row?.enabled) return null;
-  if (!row.host || !row.usernameEncrypted || !row.passwordEncrypted)
-    throw new Error("Inbound email configuration is incomplete");
-
-  const key = getInboundEncryptionKey();
-  const webhooks: InboundWebhook[] = rows.map((webhook) => ({
+export async function getInboundAccounts(): Promise<InboundAccountConfig[]> {
+  const [accounts, mailboxes, webhooks, subscriptions] = await Promise.all([
+    db.select().from(schema.inboundAccounts).where(eq(schema.inboundAccounts.enabled, true)).orderBy(asc(schema.inboundAccounts.createdAt)),
+    db.select().from(schema.inboundMailboxes).where(eq(schema.inboundMailboxes.enabled, true)).orderBy(asc(schema.inboundMailboxes.createdAt)),
+    db.select().from(schema.inboundWebhooks).orderBy(asc(schema.inboundWebhooks.createdAt)),
+    db.select().from(schema.inboundWebhookSubscriptions),
+  ]);
+  if (!accounts.length) return [];
+  const key = accounts.length ? getInboundEncryptionKey() : null;
+  const mailboxIdsByWebhook = new Map<string, string[]>();
+  for (const subscription of subscriptions) {
+    const ids = mailboxIdsByWebhook.get(subscription.webhookId) || [];
+    ids.push(subscription.mailboxId);
+    mailboxIdsByWebhook.set(subscription.webhookId, ids);
+  }
+  const runtimeWebhooks: InboundWebhook[] = webhooks.map((webhook) => ({
     id: webhook.id,
     name: webhook.name,
     url: webhook.url,
-    secret: decryptInboundValue(webhook.secretEncrypted, key, "inbound-config:webhook-secret").toString(),
+    secret: decryptInboundValue(webhook.secretEncrypted, key!, "inbound-config:webhook-secret").toString(),
+    ownerEmail: webhook.ownerEmail,
     senderFilters: webhook.senderFilters,
+    mailboxIds: mailboxIdsByWebhook.get(webhook.id) || [],
   }));
-  return {
-    ...validateInboundConfig({
-      enabled: true,
-      host: row.host,
-      port: row.port,
-      secure: row.secure,
-      username: decryptInboundValue(row.usernameEncrypted, key, "inbound-config:username").toString(),
-      password: decryptInboundValue(row.passwordEncrypted, key, "inbound-config:password").toString(),
-      mailbox: row.mailbox,
-      webhooks,
-      pollIntervalSeconds: row.pollIntervalSeconds,
-    }),
+  return accounts.map((account) => ({
+    id: account.id,
+    name: account.name,
     source: "database",
+    host: account.host,
+    port: account.port,
+    secure: account.secure,
+    username: decryptInboundValue(account.usernameEncrypted, key!, "inbound-config:username").toString(),
+    password: decryptInboundValue(account.passwordEncrypted, key!, "inbound-config:password").toString(),
+    pollIntervalSeconds: account.pollIntervalSeconds,
+    mailboxes: mailboxes.filter((mailbox) => mailbox.accountId === account.id).map((mailbox) => ({
+      id: mailbox.id,
+      name: mailbox.name,
+      path: mailbox.path,
+      webhooks: runtimeWebhooks.filter((webhook) => webhook.mailboxIds.includes(mailbox.id)),
+    })),
+  }));
+}
+
+export async function getInboundAccount(accountId: string): Promise<InboundAccountConfig | null> {
+  const [account] = await db.select().from(schema.inboundAccounts).where(eq(schema.inboundAccounts.id, accountId)).limit(1);
+  if (!account) return null;
+  const mailboxes = await db.select().from(schema.inboundMailboxes).where(eq(schema.inboundMailboxes.accountId, account.id));
+  const key = getInboundEncryptionKey();
+  return {
+    id: account.id,
+    name: account.name,
+    source: "database",
+    host: account.host,
+    port: account.port,
+    secure: account.secure,
+    username: decryptInboundValue(account.usernameEncrypted, key, "inbound-config:username").toString(),
+    password: decryptInboundValue(account.passwordEncrypted, key, "inbound-config:password").toString(),
+    pollIntervalSeconds: account.pollIntervalSeconds,
+    mailboxes: mailboxes.map((mailbox) => ({ id: mailbox.id, name: mailbox.name, path: mailbox.path, webhooks: [] })),
   };
 }
 
-export async function getInboundConfigView() {
-  const { row, webhooks } = await readInboundConfigRows();
-  const key = row?.usernameEncrypted ? getInboundEncryptionKey() : null;
+export async function getInboundConfigView(actor: { email: string; canModerate: boolean }) {
+  const [accounts, mailboxes, webhooks, subscriptions] = await Promise.all([
+    db.select().from(schema.inboundAccounts).orderBy(asc(schema.inboundAccounts.createdAt)),
+    db.select().from(schema.inboundMailboxes).orderBy(asc(schema.inboundMailboxes.createdAt)),
+    db.select().from(schema.inboundWebhooks).orderBy(asc(schema.inboundWebhooks.createdAt)),
+    db.select().from(schema.inboundWebhookSubscriptions),
+  ]);
+  const mailboxIdsByWebhook = new Map<string, string[]>();
+  for (const subscription of subscriptions) {
+    const ids = mailboxIdsByWebhook.get(subscription.webhookId) || [];
+    ids.push(subscription.mailboxId);
+    mailboxIdsByWebhook.set(subscription.webhookId, ids);
+  }
+  const key = actor.canModerate && accounts.length ? getInboundEncryptionKey() : null;
   return {
     source: "database" as const,
-    editable: true,
-    enabled: row?.enabled ?? false,
-    host: row?.host || "",
-    port: row?.port || 993,
-    secure: row?.secure ?? true,
-    username:
-      row?.usernameEncrypted && key
-        ? decryptInboundValue(row.usernameEncrypted, key, "inbound-config:username").toString()
-        : "",
-    hasPassword: Boolean(row?.passwordEncrypted),
-    mailbox: row?.mailbox || "INBOX",
-    webhooks: webhooks.map((webhook) => ({
-      id: webhook.id,
-      name: webhook.name,
-      url: webhook.url,
-      hasSecret: Boolean(webhook.secretEncrypted),
-      senderFilters: webhook.senderFilters,
+    canManageAccounts: actor.canModerate,
+    accounts: accounts.map((account) => ({
+      id: account.id,
+      name: account.name,
+      ...(actor.canModerate ? {
+        enabled: account.enabled,
+        host: account.host,
+        port: account.port,
+        secure: account.secure,
+        username: decryptInboundValue(account.usernameEncrypted, key!, "inbound-config:username").toString(),
+        hasPassword: Boolean(account.passwordEncrypted),
+        pollIntervalSeconds: account.pollIntervalSeconds,
+      } : {}),
+      mailboxes: mailboxes.filter((mailbox) => mailbox.accountId === account.id && (actor.canModerate || mailbox.enabled)).map((mailbox) => ({
+        id: mailbox.id,
+        name: mailbox.name,
+        ...(actor.canModerate ? { path: mailbox.path, enabled: mailbox.enabled } : {}),
+      })),
     })),
-    pollIntervalSeconds: row?.pollIntervalSeconds || 30,
+    webhooks: webhooks.map((webhook) => {
+      const owned = webhook.ownerEmail === actor.email;
+      return {
+        id: webhook.id,
+        name: webhook.name,
+        ownerEmail: webhook.ownerEmail,
+        owned,
+        canManage: owned || actor.canModerate,
+        ...(owned ? { url: webhook.url } : {}),
+        hasSecret: Boolean(webhook.secretEncrypted),
+        senderFilters: webhook.senderFilters,
+        mailboxIds: mailboxIdsByWebhook.get(webhook.id) || [],
+      };
+    }),
   };
 }
 
-export async function saveInboundConfig(input: InboundConfigInput) {
+export async function saveInboundAccount(id: string | undefined, input: InboundAccountInput) {
+  const value = inboundAccountInputSchema.parse(input);
+  const accountId = id || ulid();
+  const key = getInboundEncryptionKey();
   await db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${CONFIG_LOCK_NAME}, 0))`);
-    const [existing] = await tx
-      .select()
-      .from(schema.inboundConfig)
-      .where(eq(schema.inboundConfig.id, CONFIG_ID))
-      .limit(1)
-      .for("update");
-    const existingWebhooks = await tx.select().from(schema.inboundWebhooks).orderBy(schema.inboundWebhooks.createdAt);
-    const existingById = new Map(existingWebhooks.map((webhook) => [webhook.id, webhook]));
-    const key = getInboundEncryptionKey();
-    const password = input.password || (existing?.passwordEncrypted ? "preserved" : "");
-    const webhooks = input.webhooks.map((webhook) => {
-      const existingWebhook = webhook.id ? existingById.get(webhook.id) : undefined;
-      return {
-        ...webhook,
-        id: webhook.id || ulid(),
-        secret:
-          webhook.secret ||
-          (existingWebhook?.secretEncrypted
-            ? decryptInboundValue(existingWebhook.secretEncrypted, key, "inbound-config:webhook-secret").toString()
-            : ""),
-        senderFilters: normalizeSenderFilters(webhook.senderFilters),
-      };
-    });
-    if (input.enabled) validateInboundConfig({ ...input, enabled: true, password, webhooks });
-
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${INBOUND_CONFIG_LOCK_NAME}, 0))`);
+    const [existing] = id ? await tx.select().from(schema.inboundAccounts).where(eq(schema.inboundAccounts.id, id)).limit(1).for("update") : [];
+    if (id && !existing) throw new Error("Inbound account was not found");
+    if (!value.password && !existing?.passwordEncrypted) throw new Error("Password is required for a new inbound account");
     const now = new Date();
-    const values = {
-      enabled: input.enabled,
-      host: input.host.trim() || null,
-      port: input.port,
-      secure: input.secure,
-      usernameEncrypted: input.username
-        ? encryptInboundValue(input.username.trim(), key, "inbound-config:username")
-        : null,
-      passwordEncrypted: input.password
-        ? encryptInboundValue(input.password, key, "inbound-config:password")
-        : existing?.passwordEncrypted || null,
-      mailbox: input.mailbox.trim() || "INBOX",
-      pollIntervalSeconds: input.pollIntervalSeconds,
+    const accountValues = {
+      name: value.name,
+      enabled: value.enabled,
+      host: value.host,
+      port: value.port,
+      secure: value.secure,
+      usernameEncrypted: encryptInboundValue(value.username, key, "inbound-config:username"),
+      passwordEncrypted: value.password ? encryptInboundValue(value.password, key, "inbound-config:password") : existing!.passwordEncrypted,
+      pollIntervalSeconds: value.pollIntervalSeconds,
       updatedAt: now,
     };
-    await tx
-      .insert(schema.inboundConfig)
-      .values({ id: CONFIG_ID, ...values })
-      .onConflictDoUpdate({ target: schema.inboundConfig.id, set: values });
-    const webhookIds = webhooks.map((webhook) => webhook.id);
-    await Promise.all(
-      webhooks.map((webhook) =>
-        tx
-          .insert(schema.inboundWebhooks)
-          .values({
-            id: webhook.id,
-            name: webhook.name.trim(),
-            url: webhook.url.trim(),
-            secretEncrypted: webhook.secret
-              ? encryptInboundValue(webhook.secret, key, "inbound-config:webhook-secret")
-              : "",
-            senderFilters: webhook.senderFilters,
-            updatedAt: now,
-          })
-          .onConflictDoUpdate({
-            target: schema.inboundWebhooks.id,
-            set: {
-              name: webhook.name.trim(),
-              url: webhook.url.trim(),
-              secretEncrypted: webhook.secret
-                ? encryptInboundValue(webhook.secret, key, "inbound-config:webhook-secret")
-                : "",
-              senderFilters: webhook.senderFilters,
-              updatedAt: now,
-            },
-          }),
-      ),
-    );
-    const deletedIds = existingWebhooks
-      .filter((webhook) => !webhookIds.includes(webhook.id))
-      .map((webhook) => webhook.id);
-    for (const id of deletedIds) await tx.delete(schema.inboundWebhooks).where(eq(schema.inboundWebhooks.id, id));
+    if (existing) await tx.update(schema.inboundAccounts).set(accountValues).where(eq(schema.inboundAccounts.id, accountId));
+    else await tx.insert(schema.inboundAccounts).values({ id: accountId, ...accountValues });
+
+    const existingMailboxes = await tx.select().from(schema.inboundMailboxes).where(eq(schema.inboundMailboxes.accountId, accountId));
+    const retainedIds: string[] = [];
+    for (const mailbox of value.mailboxes) {
+      const existingMailbox = mailbox.id ? existingMailboxes.find((candidate) => candidate.id === mailbox.id) : undefined;
+      if (mailbox.id && !existingMailbox) throw new Error("Mailbox does not belong to this account");
+      const mailboxId = existingMailbox?.id || ulid();
+      retainedIds.push(mailboxId);
+      const mailboxValues = { name: mailbox.name, path: mailbox.path, enabled: mailbox.enabled, updatedAt: now };
+      if (existingMailbox) await tx.update(schema.inboundMailboxes).set(mailboxValues).where(eq(schema.inboundMailboxes.id, mailboxId));
+      else await tx.insert(schema.inboundMailboxes).values({ id: mailboxId, accountId, ...mailboxValues });
+    }
+    const removedIds = existingMailboxes.filter((mailbox) => !retainedIds.includes(mailbox.id)).map((mailbox) => mailbox.id);
+    if (removedIds.length) await tx.delete(schema.inboundMailboxes).where(inArray(schema.inboundMailboxes.id, removedIds));
+  });
+  return { id: accountId };
+}
+
+export async function deleteInboundAccount(id: string) {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${INBOUND_CONFIG_LOCK_NAME}, 0))`);
+    const deleted = await tx.delete(schema.inboundAccounts).where(eq(schema.inboundAccounts.id, id)).returning({ id: schema.inboundAccounts.id });
+    if (!deleted.length) throw new Error("Inbound account was not found");
+  });
+}
+
+export async function createInboundWebhook(ownerEmail: string, input: z.infer<typeof inboundWebhookInputSchema>) {
+  const value = inboundWebhookInputSchema.parse(input);
+  if (!value.url) throw new Error("URL is required for a new webhook");
+  if (!value.secret) throw new Error("Secret is required for a new webhook");
+  validateWebhookUrl(value.url);
+  const id = ulid();
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${INBOUND_CONFIG_LOCK_NAME}, 0))`);
+    const mailboxes = await tx.select({ id: schema.inboundMailboxes.id }).from(schema.inboundMailboxes).where(inArray(schema.inboundMailboxes.id, value.mailboxIds));
+    if (mailboxes.length !== value.mailboxIds.length) throw new Error("One or more subscribed mailboxes were not found");
+    await tx.insert(schema.inboundWebhooks).values({
+      id,
+      name: value.name,
+      url: value.url!,
+      secretEncrypted: encryptInboundValue(value.secret!, getInboundEncryptionKey(), "inbound-config:webhook-secret"),
+      ownerEmail,
+      senderFilters: value.senderFilters,
+    });
+    await tx.insert(schema.inboundWebhookSubscriptions).values(value.mailboxIds.map((mailboxId) => ({ webhookId: id, mailboxId })));
+  });
+  return { id };
+}
+
+export async function updateInboundWebhook(id: string, input: z.infer<typeof inboundWebhookInputSchema>) {
+  const value = inboundWebhookInputSchema.parse(input);
+  if (value.url) validateWebhookUrl(value.url);
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${INBOUND_CONFIG_LOCK_NAME}, 0))`);
+    const mailboxes = await tx.select({ id: schema.inboundMailboxes.id }).from(schema.inboundMailboxes).where(inArray(schema.inboundMailboxes.id, value.mailboxIds));
+    if (mailboxes.length !== value.mailboxIds.length) throw new Error("One or more subscribed mailboxes were not found");
+    const values = {
+      name: value.name,
+      ...(value.url ? { url: value.url } : {}),
+      ...(value.secret ? { secretEncrypted: encryptInboundValue(value.secret, getInboundEncryptionKey(), "inbound-config:webhook-secret") } : {}),
+      senderFilters: value.senderFilters,
+      updatedAt: new Date(),
+    };
+    const updated = await tx.update(schema.inboundWebhooks).set(values).where(eq(schema.inboundWebhooks.id, id)).returning({ id: schema.inboundWebhooks.id });
+    if (!updated.length) throw new Error("Webhook was not found");
+    await tx.delete(schema.inboundWebhookSubscriptions).where(eq(schema.inboundWebhookSubscriptions.webhookId, id));
+    await tx.insert(schema.inboundWebhookSubscriptions).values(value.mailboxIds.map((mailboxId) => ({ webhookId: id, mailboxId })));
+  });
+}
+
+export async function getInboundWebhook(id: string) {
+  const [webhook] = await db.select().from(schema.inboundWebhooks).where(eq(schema.inboundWebhooks.id, id)).limit(1);
+  return webhook;
+}
+
+export async function deleteInboundWebhook(id: string) {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${INBOUND_CONFIG_LOCK_NAME}, 0))`);
+    const deleted = await tx.delete(schema.inboundWebhooks).where(eq(schema.inboundWebhooks.id, id)).returning({ id: schema.inboundWebhooks.id });
+    if (!deleted.length) throw new Error("Webhook was not found");
   });
 }

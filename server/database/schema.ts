@@ -65,6 +65,41 @@ export const inboundConfig = pgTable("inbound_config", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const inboundAccounts = pgTable(
+  "inbound_accounts",
+  {
+    id: text("id").primaryKey().$defaultFn(() => ulid()),
+    name: text("name").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    host: text("host").notNull(),
+    port: integer("port").notNull().default(993),
+    secure: boolean("secure").notNull().default(true),
+    usernameEncrypted: text("username_encrypted").notNull(),
+    passwordEncrypted: text("password_encrypted").notNull(),
+    pollIntervalSeconds: integer("poll_interval_seconds").notNull().default(30),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("inbound_accounts_name_unique").on(table.name)],
+);
+
+export const inboundMailboxes = pgTable(
+  "inbound_mailboxes",
+  {
+    id: text("id").primaryKey().$defaultFn(() => ulid()),
+    accountId: text("account_id").notNull().references(() => inboundAccounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    path: text("path").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("inbound_mailboxes_account_name_unique").on(table.accountId, table.name),
+    uniqueIndex("inbound_mailboxes_account_path_unique").on(table.accountId, table.path),
+  ],
+);
+
 export const inboundWebhooks = pgTable(
   "inbound_webhooks",
   {
@@ -72,11 +107,22 @@ export const inboundWebhooks = pgTable(
     name: text("name").notNull(),
     url: text("url").notNull(),
     secretEncrypted: text("secret_encrypted").notNull(),
+    ownerEmail: text("owner_email").notNull(),
     senderFilters: text("sender_filters").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("inbound_webhooks_created_at_idx").on(table.createdAt)],
+);
+
+export const inboundWebhookSubscriptions = pgTable(
+  "inbound_webhook_subscriptions",
+  {
+    webhookId: text("webhook_id").notNull().references(() => inboundWebhooks.id, { onDelete: "cascade" }),
+    mailboxId: text("mailbox_id").notNull().references(() => inboundMailboxes.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("inbound_webhook_subscriptions_unique").on(table.webhookId, table.mailboxId)],
 );
 
 export const inboundRuntimeState = pgTable("inbound_runtime_state", {
@@ -97,6 +143,10 @@ export const inboundMessages = pgTable(
       .primaryKey()
       .$defaultFn(() => ulid()),
     accountFingerprint: text("account_fingerprint").notNull(),
+    accountId: text("account_id").references(() => inboundAccounts.id, { onDelete: "set null" }),
+    accountName: text("account_name"),
+    mailboxId: text("mailbox_id").references(() => inboundMailboxes.id, { onDelete: "set null" }),
+    mailboxName: text("mailbox_name"),
     mailbox: text("mailbox").notNull(),
     uidValidity: text("uid_validity").notNull(),
     uid: bigint("uid", { mode: "number" }).notNull(),
