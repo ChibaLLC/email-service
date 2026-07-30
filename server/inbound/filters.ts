@@ -3,8 +3,13 @@ export function normalizeSenderFilters(filters: string[]): string[] {
 }
 
 export function matchesSenderFilters(sender: string | undefined, filters: string[]): boolean {
-  const normalized = sender?.trim().toLowerCase();
-  if (!normalized) return false;
   const normalizedFilters = normalizeSenderFilters(filters);
-  return normalizedFilters.length === 0 || normalizedFilters.some((filter) => filter === normalized || (filter.startsWith("@") && normalized.endsWith(filter)));
+  if (normalizedFilters.length === 0) return true;
+  const normalized = sender?.trim().toLowerCase();
+  return Boolean(
+    normalized &&
+    normalizedFilters.some(
+      (filter) => filter === normalized || (filter.startsWith("@") && normalized.endsWith(filter)),
+    ),
+  );
 }

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { env } from "std-env";
 import { ulid } from "ulid";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { normalizeSenderFilters } from "./filters";
 import type { InboundConfig, InboundConfigInput, InboundWebhook } from "./types";
 
 const CONFIG_ID = "primary";
+const CONFIG_LOCK_NAME = "email-service:inbound-config:primary";
 const inboundWebhookInputSchema = z.object({
   id: z.string().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(100),
@@ -75,15 +76,30 @@ export function getInboundEncryptionKey(): Buffer {
 export function validateInboundConfig(input: Omit<InboundConfig, "source">): Omit<InboundConfig, "source"> {
   const config = configSchema.parse(input);
   for (const webhook of config.webhooks) validateWebhookUrl(webhook.url);
-  return { ...config, webhooks: config.webhooks.map((webhook) => ({ ...webhook, senderFilters: normalizeSenderFilters(webhook.senderFilters) })) };
+  return {
+    ...config,
+    webhooks: config.webhooks.map((webhook) => ({
+      ...webhook,
+      senderFilters: normalizeSenderFilters(webhook.senderFilters),
+    })),
+  };
+}
+
+async function readInboundConfigRows() {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${CONFIG_LOCK_NAME}, 0))`);
+    const [row] = await tx.select().from(schema.inboundConfig).where(eq(schema.inboundConfig.id, CONFIG_ID)).limit(1);
+    const webhooks = await tx.select().from(schema.inboundWebhooks).orderBy(schema.inboundWebhooks.createdAt);
+    return { row, webhooks };
+  });
 }
 
 export async function getInboundConfig(): Promise<InboundConfig | null> {
-  const [row] = await db.select().from(schema.inboundConfig).where(eq(schema.inboundConfig.id, CONFIG_ID)).limit(1);
+  const { row, webhooks: rows } = await readInboundConfigRows();
   if (!row?.enabled) return null;
-  if (!row.host || !row.usernameEncrypted || !row.passwordEncrypted) throw new Error("Inbound email configuration is incomplete");
+  if (!row.host || !row.usernameEncrypted || !row.passwordEncrypted)
+    throw new Error("Inbound email configuration is incomplete");
 
-  const rows = await db.select().from(schema.inboundWebhooks).orderBy(schema.inboundWebhooks.createdAt);
   const key = getInboundEncryptionKey();
   const webhooks: InboundWebhook[] = rows.map((webhook) => ({
     id: webhook.id,
@@ -109,10 +125,7 @@ export async function getInboundConfig(): Promise<InboundConfig | null> {
 }
 
 export async function getInboundConfigView() {
-  const [[row], webhooks] = await Promise.all([
-    db.select().from(schema.inboundConfig).where(eq(schema.inboundConfig.id, CONFIG_ID)).limit(1),
-    db.select().from(schema.inboundWebhooks).orderBy(schema.inboundWebhooks.createdAt),
-  ]);
+  const { row, webhooks } = await readInboundConfigRows();
   const key = row?.usernameEncrypted ? getInboundEncryptionKey() : null;
   return {
     source: "database" as const,
@@ -121,7 +134,10 @@ export async function getInboundConfigView() {
     host: row?.host || "",
     port: row?.port || 993,
     secure: row?.secure ?? true,
-    username: row?.usernameEncrypted && key ? decryptInboundValue(row.usernameEncrypted, key, "inbound-config:username").toString() : "",
+    username:
+      row?.usernameEncrypted && key
+        ? decryptInboundValue(row.usernameEncrypted, key, "inbound-config:username").toString()
+        : "",
     hasPassword: Boolean(row?.passwordEncrypted),
     mailbox: row?.mailbox || "INBOX",
     webhooks: webhooks.map((webhook) => ({
@@ -137,26 +153,41 @@ export async function getInboundConfigView() {
 
 export async function saveInboundConfig(input: InboundConfigInput) {
   await db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(schema.inboundConfig).where(eq(schema.inboundConfig.id, CONFIG_ID)).limit(1).for("update");
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${CONFIG_LOCK_NAME}, 0))`);
+    const [existing] = await tx
+      .select()
+      .from(schema.inboundConfig)
+      .where(eq(schema.inboundConfig.id, CONFIG_ID))
+      .limit(1)
+      .for("update");
     const existingWebhooks = await tx.select().from(schema.inboundWebhooks).orderBy(schema.inboundWebhooks.createdAt);
     const existingById = new Map(existingWebhooks.map((webhook) => [webhook.id, webhook]));
+    const key = getInboundEncryptionKey();
     const password = input.password || (existing?.passwordEncrypted ? "preserved" : "");
-    const webhooks = input.webhooks.map((webhook) => ({
-      ...webhook,
-      id: webhook.id || ulid(),
-      secret: webhook.secret || (webhook.id ? (existingById.get(webhook.id)?.secretEncrypted ? "x".repeat(32) : "") : ""),
-      senderFilters: normalizeSenderFilters(webhook.senderFilters),
-    }));
+    const webhooks = input.webhooks.map((webhook) => {
+      const existingWebhook = webhook.id ? existingById.get(webhook.id) : undefined;
+      return {
+        ...webhook,
+        id: webhook.id || ulid(),
+        secret:
+          webhook.secret ||
+          (existingWebhook?.secretEncrypted
+            ? decryptInboundValue(existingWebhook.secretEncrypted, key, "inbound-config:webhook-secret").toString()
+            : ""),
+        senderFilters: normalizeSenderFilters(webhook.senderFilters),
+      };
+    });
     if (input.enabled) validateInboundConfig({ ...input, enabled: true, password, webhooks });
 
-    const key = getInboundEncryptionKey();
     const now = new Date();
     const values = {
       enabled: input.enabled,
       host: input.host.trim() || null,
       port: input.port,
       secure: input.secure,
-      usernameEncrypted: input.username ? encryptInboundValue(input.username.trim(), key, "inbound-config:username") : null,
+      usernameEncrypted: input.username
+        ? encryptInboundValue(input.username.trim(), key, "inbound-config:username")
+        : null,
       passwordEncrypted: input.password
         ? encryptInboundValue(input.password, key, "inbound-config:password")
         : existing?.passwordEncrypted || null,
@@ -164,7 +195,10 @@ export async function saveInboundConfig(input: InboundConfigInput) {
       pollIntervalSeconds: input.pollIntervalSeconds,
       updatedAt: now,
     };
-    await tx.insert(schema.inboundConfig).values({ id: CONFIG_ID, ...values }).onConflictDoUpdate({ target: schema.inboundConfig.id, set: values });
+    await tx
+      .insert(schema.inboundConfig)
+      .values({ id: CONFIG_ID, ...values })
+      .onConflictDoUpdate({ target: schema.inboundConfig.id, set: values });
     const webhookIds = webhooks.map((webhook) => webhook.id);
     await Promise.all(
       webhooks.map((webhook) =>
@@ -174,9 +208,9 @@ export async function saveInboundConfig(input: InboundConfigInput) {
             id: webhook.id,
             name: webhook.name.trim(),
             url: webhook.url.trim(),
-            secretEncrypted: webhook.secret && webhook.secret !== "x".repeat(32)
+            secretEncrypted: webhook.secret
               ? encryptInboundValue(webhook.secret, key, "inbound-config:webhook-secret")
-              : existingById.get(webhook.id)?.secretEncrypted || "",
+              : "",
             senderFilters: webhook.senderFilters,
             updatedAt: now,
           })
@@ -185,16 +219,18 @@ export async function saveInboundConfig(input: InboundConfigInput) {
             set: {
               name: webhook.name.trim(),
               url: webhook.url.trim(),
-              secretEncrypted: webhook.secret && webhook.secret !== "x".repeat(32)
+              secretEncrypted: webhook.secret
                 ? encryptInboundValue(webhook.secret, key, "inbound-config:webhook-secret")
-                : existingById.get(webhook.id)?.secretEncrypted || "",
+                : "",
               senderFilters: webhook.senderFilters,
               updatedAt: now,
             },
           }),
       ),
     );
-    const deletedIds = existingWebhooks.filter((webhook) => !webhookIds.includes(webhook.id)).map((webhook) => webhook.id);
+    const deletedIds = existingWebhooks
+      .filter((webhook) => !webhookIds.includes(webhook.id))
+      .map((webhook) => webhook.id);
     for (const id of deletedIds) await tx.delete(schema.inboundWebhooks).where(eq(schema.inboundWebhooks.id, id));
   });
 }
