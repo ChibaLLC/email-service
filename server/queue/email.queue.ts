@@ -3,6 +3,7 @@ import { getRedisConnection } from "./connection";
 
 export interface EmailJobData {
   emailId: string;
+  outboundSettingsId?: string;
   from: string;
   to: string | string[];
   subject: string;

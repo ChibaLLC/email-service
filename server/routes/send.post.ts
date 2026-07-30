@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db, schema } from "../database";
 import { getDefaultFromAddress } from "../email/config";
+import { getActiveOutboundSettings } from "../email/settings";
 import { addEmailJob } from "../queue/email.queue";
 import { hashApiKey } from "../utils/auth";
 import { eq } from "drizzle-orm";
@@ -56,7 +57,8 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const from = data.from || getDefaultFromAddress();
+  const outbound = await getActiveOutboundSettings();
+  const from = data.from || getDefaultFromAddress(outbound.config);
   const bodyType = "html" in data ? "html" : "text";
 
   // Insert email record
@@ -64,6 +66,7 @@ export default defineEventHandler(async (event) => {
     .insert(schema.emails)
     .values({
       apiKeyId: apiKey.id,
+      outboundSettingsId: outbound.id,
       from,
       to: Array.isArray(data.to) ? data.to.join(", ") : data.to,
       subject: data.subject,
@@ -73,14 +76,20 @@ export default defineEventHandler(async (event) => {
     .returning();
 
   // Queue the job
-  await addEmailJob({
-    emailId: emailRecord!.id,
-    from,
-    to: data.to,
-    subject: data.subject,
-    ...("html" in data ? { html: data.html } : { text: data.text }),
-    ...(data.attachments?.length ? { attachments: data.attachments } : {}),
-  });
+  try {
+    await addEmailJob({
+      emailId: emailRecord!.id,
+      outboundSettingsId: outbound.id,
+      from,
+      to: data.to,
+      subject: data.subject,
+      ...("html" in data ? { html: data.html } : { text: data.text }),
+      ...(data.attachments?.length ? { attachments: data.attachments } : {}),
+    });
+  } catch (error) {
+    await db.update(schema.emails).set({ status: "failed", error: "Could not enqueue email" }).where(eq(schema.emails.id, emailRecord!.id));
+    throw error;
+  }
 
   // Update last used
   db.update(schema.apiKeys)

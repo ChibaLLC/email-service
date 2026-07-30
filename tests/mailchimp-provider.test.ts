@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockFactory = vi.fn();
 const mockSend = vi.fn();
 const mockPing = vi.fn();
+const config = { EMAIL_PROVIDER: "mailchimp" as const, DEFAULT_FROM: "team@ifkafin.com", MAILCHIMP_TRANSACTIONAL_API_KEY: "mc_test_key" };
 
 vi.mock("@mailchimp/mailchimp_transactional", () => ({
   default: (apiKey: string) => {
@@ -33,12 +34,6 @@ describe("MailchimpProvider", () => {
     process.env = { ...originalEnv };
   });
 
-  it("throws when MAILCHIMP_TRANSACTIONAL_API_KEY is missing", async () => {
-    const { MailchimpProvider } = await import("../server/email/providers/mailchimp");
-
-    expect(() => new MailchimpProvider()).toThrow(/MAILCHIMP_TRANSACTIONAL_API_KEY is required/);
-  });
-
   it("sends email with mapped recipients and attachments", async () => {
     process.env.MAILCHIMP_TRANSACTIONAL_API_KEY = "mc_test_key";
     process.env.DEFAULT_FROM = "team@ifkafin.com";
@@ -50,7 +45,7 @@ describe("MailchimpProvider", () => {
     ]);
 
     const { MailchimpProvider } = await import("../server/email/providers/mailchimp");
-    const provider = new MailchimpProvider();
+    const provider = new MailchimpProvider(config);
 
     const result = await provider.send({
       to: ["allan.bosire@ifkafin.com"],
@@ -93,7 +88,7 @@ describe("MailchimpProvider", () => {
     mockSend.mockResolvedValue([{ _id: "mc_message_456", status: "sent" }]);
 
     const { MailchimpProvider } = await import("../server/email/providers/mailchimp");
-    const provider = new MailchimpProvider();
+    const provider = new MailchimpProvider(config);
 
     await provider.send({
       to: "allan.bosire@ifkafin.com",
@@ -122,7 +117,7 @@ describe("MailchimpProvider", () => {
     ]);
 
     const { MailchimpProvider } = await import("../server/email/providers/mailchimp");
-    const provider = new MailchimpProvider();
+    const provider = new MailchimpProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",
@@ -143,7 +138,7 @@ describe("MailchimpProvider", () => {
     mockPing.mockResolvedValue("PONG!");
 
     const { MailchimpProvider } = await import("../server/email/providers/mailchimp");
-    const provider = new MailchimpProvider();
+    const provider = new MailchimpProvider(config);
 
     await expect(provider.verify?.()).resolves.toBe(true);
   });
@@ -154,7 +149,7 @@ describe("MailchimpProvider", () => {
     mockPing.mockRejectedValue(new Error("invalid api key"));
 
     const { MailchimpProvider } = await import("../server/email/providers/mailchimp");
-    const provider = new MailchimpProvider();
+    const provider = new MailchimpProvider(config);
 
     await expect(provider.verify?.()).resolves.toBe(false);
   });

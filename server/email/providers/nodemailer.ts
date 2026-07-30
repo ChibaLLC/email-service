@@ -1,5 +1,5 @@
 import { createTransport, type Transporter } from "nodemailer";
-import { getDefaultFromAddress, parseEmailProviderConfig, type NodemailerConfig } from "../config";
+import { getDefaultFromAddress, type NodemailerConfig } from "../config";
 import type { EmailProvider, EmailMessage, EmailResult } from "../types";
 
 export class NodemailerProvider implements EmailProvider {
@@ -7,8 +7,8 @@ export class NodemailerProvider implements EmailProvider {
   private transporter: Transporter;
   private config: NodemailerConfig;
 
-  constructor() {
-    this.config = parseEmailProviderConfig("nodemailer");
+  constructor(config: NodemailerConfig) {
+    this.config = config;
     this.transporter = createTransport({
       host: this.config.SMTP_HOST,
       port: this.config.SMTP_PORT,

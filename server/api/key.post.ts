@@ -3,7 +3,7 @@ import { ulid } from "ulid";
 import { render } from "@vue-email/render";
 import { hashApiKey } from "../utils/auth";
 import { db, schema } from "../database";
-import { getEmailProvider } from "../email/providers";
+import { getEmailProviderForSettings } from "../email/settings";
 import ApiKeyEmail from "../emails/ApiKeyEmail.vue";
 import { z } from "zod";
 import { isApiKeyEmailAllowed } from "../settings/policy";
@@ -25,6 +25,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: "Email domain is not allowed for API keys" });
   }
 
+  const { provider } = await getEmailProviderForSettings();
+
   // Generate a unique API key
   const rawKey = `${ulid()}_${v4()}`;
   const keyHash = hashApiKey(rawKey);
@@ -41,12 +43,12 @@ export default defineEventHandler(async (event) => {
   const html = await render(ApiKeyEmail, { apiKey: rawKey });
 
   // Send the key via email
-  const provider = getEmailProvider();
-  await provider.send({
+  const result = await provider.send({
     to: data.email,
     subject: "Your Email Service API Key",
     html,
   });
+  if (!result.success) throw createError({ statusCode: 502, message: `Could not send API key: ${result.error || "provider error"}` });
 
   return { success: true, message: "API key sent to your email" };
 });

@@ -5,6 +5,14 @@
       <p class="mt-1 text-sm text-gray-400">Manage services connected to email delivery and ingestion.</p>
     </div>
     <div class="grid gap-4 md:grid-cols-2">
+      <NuxtLink to="/dashboard/outbound" class="group rounded-xl bg-white/5 p-6 ring-1 ring-gray-800 transition hover:bg-white/[.07] hover:ring-gray-700">
+        <div class="flex items-start justify-between gap-4">
+          <span class="rounded-lg bg-violet-400/10 p-3"><Icon name="material-symbols-light:outgoing-mail" class="size-7 text-violet-400" /></span>
+          <Icon name="material-symbols-light:arrow-forward" class="size-5 text-gray-500 transition group-hover:translate-x-1 group-hover:text-gray-300" />
+        </div>
+        <h2 class="mt-5 text-lg font-semibold">Outbound email</h2>
+        <p class="mt-2 text-sm leading-6 text-gray-400">Select SMTP or an API provider and manage encrypted delivery credentials.</p>
+      </NuxtLink>
       <NuxtLink to="/dashboard/listmonk" class="group rounded-xl bg-white/5 p-6 ring-1 ring-gray-800 transition hover:bg-white/[.07] hover:ring-gray-700">
         <div class="flex items-start justify-between gap-4">
           <span class="rounded-lg bg-lime-400/10 p-3"><Icon name="material-symbols-light:article-outline" class="size-7 text-lime-400" /></span>

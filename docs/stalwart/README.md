@@ -482,16 +482,9 @@ Operational notes:
 
 The app does not need a new provider for Stalwart. Use the existing nodemailer provider.
 
-For the consolidated production stack, set `.env` like this when the app should send through Stalwart:
-
-```bash
-EMAIL_PROVIDER=nodemailer
-SMTP_HOST=stalwart
-SMTP_PORT=587
-SMTP_USER=your-stalwart-account@example.com
-SMTP_PASS=your-stalwart-password
-DEFAULT_FROM=your-stalwart-account@example.com
-```
+Configure SMTP from the dashboard's **Outbound email** page. Use `stalwart` as
+the host and `587` as the port, then enter the Stalwart account address as both
+the username and default sender.
 
 Because [server/email/providers/nodemailer.ts](../../server/email/providers/nodemailer.ts) treats port `465` as implicit TLS and all other ports as non-implicit TLS, `587` is the safest default for authenticated submission.
 

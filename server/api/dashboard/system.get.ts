@@ -1,18 +1,14 @@
 import { env } from "std-env";
+import { getOutboundSettingsView } from "../../email/settings";
 import { getListmonkSettingsView } from "../../listmonk/config";
 import { assertDashboardAdmin } from "../../settings/policy";
 
 export default defineEventHandler(async (event) => {
   await assertDashboardAdmin(event);
+  const outbound = await getOutboundSettingsView();
   return {
-    emailProvider: env.EMAIL_PROVIDER || null,
-    outbound: {
-      smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
-      resendConfigured: Boolean(env.RESEND_API_KEY),
-      sendgridConfigured: Boolean(env.SENDGRID_API_KEY),
-      mailchimpConfigured: Boolean(env.MAILCHIMP_TRANSACTIONAL_API_KEY),
-      postalConfigured: Boolean(env.POSTAL_API_URL && env.POSTAL_SERVER_API_KEY),
-    },
+    emailProvider: outbound.active?.provider || null,
+    outbound,
     settingsEncryptionConfigured: Boolean(env.SETTINGS_ENCRYPTION_KEY),
     listmonk: await getListmonkSettingsView(),
   };

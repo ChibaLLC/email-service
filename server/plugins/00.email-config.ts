@@ -1,6 +1,11 @@
-import { validateSelectedEmailProviderConfig } from "../email/config";
+import { getActiveOutboundSettings, getOutboundSettingsView } from "../email/settings";
 
-export default defineNitroPlugin(() => {
-  const config = validateSelectedEmailProviderConfig();
-  console.log(`[plugin:email-config] Validated ${config.EMAIL_PROVIDER} email provider configuration`);
+export default defineNitroPlugin(async () => {
+  const view = await getOutboundSettingsView();
+  if (!view.configured) {
+    console.warn("[plugin:email-config] No active outbound provider. Dashboard and API remain available for initial configuration.");
+    return;
+  }
+  const active = await getActiveOutboundSettings();
+  console.log(`[plugin:email-config] Validated database outbound provider ${active.config.EMAIL_PROVIDER} (version ${active.version})`);
 });

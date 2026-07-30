@@ -67,6 +67,27 @@ export interface QueueStats {
   total: number;
 }
 
+export type OutboundProviderName = "nodemailer" | "resend" | "sendgrid" | "mailchimp" | "postal";
+
+export type OutboundSettingsInput =
+  | { provider: "nodemailer"; defaultFrom: string; host: string; port: number; username: string; password?: string }
+  | { provider: "resend"; defaultFrom?: string; apiKey?: string }
+  | { provider: "sendgrid" | "mailchimp"; defaultFrom: string; apiKey?: string }
+  | { provider: "postal"; defaultFrom: string; apiUrl: string; serverApiKey?: string };
+
+export interface OutboundSettingsView {
+  source: "database";
+  configured: boolean;
+  active: null | {
+    id: string;
+    version: number;
+    provider: OutboundProviderName;
+    config: Record<string, string | number | boolean | undefined>;
+    createdAt: string;
+    createdBy: string;
+  };
+}
+
 export interface InboundEmailConfigView {
   source: "database";
   canManageAccounts: boolean;

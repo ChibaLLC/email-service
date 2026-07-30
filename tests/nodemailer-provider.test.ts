@@ -3,6 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockCreateTransport = vi.fn();
 const mockSendMail = vi.fn();
 const mockVerify = vi.fn();
+const config = {
+  EMAIL_PROVIDER: "nodemailer" as const,
+  DEFAULT_FROM: "team@ifkafin.com",
+  SMTP_HOST: "smtp.example.com",
+  SMTP_PORT: 587,
+  SMTP_USER: "mailer@example.com",
+  SMTP_PASS: "secret",
+};
 
 vi.mock("nodemailer", () => ({
   createTransport: (...args: unknown[]) => {
@@ -37,7 +45,7 @@ describe("NodemailerProvider", () => {
   it("creates a transporter from SMTP config", async () => {
     const { NodemailerProvider } = await import("../server/email/providers/nodemailer");
 
-    new NodemailerProvider();
+    new NodemailerProvider(config);
 
     expect(mockCreateTransport).toHaveBeenCalledWith({
       host: "smtp.example.com",
@@ -54,7 +62,7 @@ describe("NodemailerProvider", () => {
     mockSendMail.mockResolvedValue({ messageId: "message_123" });
 
     const { NodemailerProvider } = await import("../server/email/providers/nodemailer");
-    const provider = new NodemailerProvider();
+    const provider = new NodemailerProvider(config);
 
     const result = await provider.send({
       to: ["allan.bosire@ifkafin.com", "team@ifkafin.com"],
@@ -92,7 +100,7 @@ describe("NodemailerProvider", () => {
     mockSendMail.mockResolvedValue({ messageId: "message_456" });
 
     const { NodemailerProvider } = await import("../server/email/providers/nodemailer");
-    const provider = new NodemailerProvider();
+    const provider = new NodemailerProvider(config);
 
     await provider.send({
       to: "allan.bosire@ifkafin.com",
@@ -112,7 +120,7 @@ describe("NodemailerProvider", () => {
     mockSendMail.mockRejectedValue(new Error("SMTP timeout"));
 
     const { NodemailerProvider } = await import("../server/email/providers/nodemailer");
-    const provider = new NodemailerProvider();
+    const provider = new NodemailerProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",
@@ -131,7 +139,7 @@ describe("NodemailerProvider", () => {
     mockVerify.mockResolvedValue(undefined);
 
     const { NodemailerProvider } = await import("../server/email/providers/nodemailer");
-    const provider = new NodemailerProvider();
+    const provider = new NodemailerProvider(config);
 
     await expect(provider.verify?.()).resolves.toBe(true);
   });
@@ -140,7 +148,7 @@ describe("NodemailerProvider", () => {
     mockVerify.mockRejectedValue(new Error("Connection refused"));
 
     const { NodemailerProvider } = await import("../server/email/providers/nodemailer");
-    const provider = new NodemailerProvider();
+    const provider = new NodemailerProvider(config);
 
     await expect(provider.verify?.()).resolves.toBe(false);
   });

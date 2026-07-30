@@ -2,11 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSetApiKey = vi.fn();
 const mockSend = vi.fn();
+const mockRequest = vi.fn();
+const config = { EMAIL_PROVIDER: "sendgrid" as const, DEFAULT_FROM: "team@ifkafin.com", SENDGRID_API_KEY: "SG.test-key" };
 
 vi.mock("@sendgrid/mail", () => ({
   default: {
-    setApiKey: mockSetApiKey,
-    send: mockSend,
+    constructor: class {
+      client = { request: mockRequest };
+      setApiKey = mockSetApiKey;
+      send = mockSend;
+    },
   },
 }));
 
@@ -25,12 +30,6 @@ describe("SendGridProvider", () => {
     process.env = { ...originalEnv };
   });
 
-  it("throws when SENDGRID_API_KEY is missing", async () => {
-    const { SendGridProvider } = await import("../server/email/providers/sendgrid");
-
-    expect(() => new SendGridProvider()).toThrow(/SENDGRID_API_KEY is required/);
-  });
-
   it("sends email with mapped attachments and default from address", async () => {
     process.env.SENDGRID_API_KEY = "SG.test-key";
     process.env.DEFAULT_FROM = "team@ifkafin.com";
@@ -44,7 +43,7 @@ describe("SendGridProvider", () => {
     ]);
 
     const { SendGridProvider } = await import("../server/email/providers/sendgrid");
-    const provider = new SendGridProvider();
+    const provider = new SendGridProvider(config);
 
     const result = await provider.send({
       to: ["allan.bosire@ifkafin.com"],
@@ -86,7 +85,7 @@ describe("SendGridProvider", () => {
     mockSend.mockResolvedValue([{ headers: {} }, {}]);
 
     const { SendGridProvider } = await import("../server/email/providers/sendgrid");
-    const provider = new SendGridProvider();
+    const provider = new SendGridProvider(config);
 
     await provider.send({
       to: "allan.bosire@ifkafin.com",
@@ -115,7 +114,7 @@ describe("SendGridProvider", () => {
     });
 
     const { SendGridProvider } = await import("../server/email/providers/sendgrid");
-    const provider = new SendGridProvider();
+    const provider = new SendGridProvider(config);
 
     const result = await provider.send({
       from: "sender@example.com",

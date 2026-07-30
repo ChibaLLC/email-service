@@ -17,12 +17,6 @@ services:
       POSTGRES_DB: email_service
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/email_service
       REDIS_URL: redis://redis:6379
-      EMAIL_PROVIDER: nodemailer
-      SMTP_HOST: smtp.titan.email
-      SMTP_PORT: 587
-      SMTP_USER: noreply@ifkafin.com
-      SMTP_PASS: ""
-      DEFAULT_FROM: noreply@ifkafin.com
       JWT_SECRET: dev_container_secret_change_in_prod
       ALLOWED_DOMAINS: ifkafin.com,finueva.com,heilomeet.com
     networks:

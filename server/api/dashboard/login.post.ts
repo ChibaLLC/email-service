@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { render } from "@vue-email/render";
 import { generateOTP } from "../../utils/otp";
-import { getEmailProvider } from "../../email/providers";
+import { getEmailProviderForSettings } from "../../email/settings";
 import OtpEmail from "../../emails/OtpEmail.vue";
 import { isLoginEmailAllowed } from "../../settings/policy";
 
@@ -24,17 +24,19 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  const { provider } = await getEmailProviderForSettings();
+
   // Generate OTP and render email
   const code = await generateOTP(data.email);
   const html = await render(OtpEmail, { code });
 
   // Send via provider
-  const provider = getEmailProvider();
-  await provider.send({
+  const result = await provider.send({
     to: data.email,
     subject: "Dashboard Login Code",
     html,
   });
+  if (!result.success) throw createError({ statusCode: 502, message: `Could not send login code: ${result.error || "provider error"}` });
 
   return { success: true, message: "Verification code sent to your email" };
 });

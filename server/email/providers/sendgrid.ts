@@ -1,5 +1,5 @@
 import sgMail from "@sendgrid/mail";
-import { getDefaultFromAddress, parseEmailProviderConfig, type SendGridConfig } from "../config";
+import { getDefaultFromAddress, type SendGridConfig } from "../config";
 import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "../types";
 
 function mapAttachment(attachment: EmailAttachment) {
@@ -41,15 +41,18 @@ function getErrorMessage(error: unknown): string {
 export class SendGridProvider implements EmailProvider {
   readonly name = "sendgrid";
   private config: SendGridConfig;
+  private client: typeof sgMail;
 
-  constructor() {
-    this.config = parseEmailProviderConfig("sendgrid");
-    sgMail.setApiKey(this.config.SENDGRID_API_KEY);
+  constructor(config: SendGridConfig) {
+    this.config = config;
+    const MailService = sgMail.constructor as new () => typeof sgMail;
+    this.client = new MailService();
+    this.client.setApiKey(this.config.SENDGRID_API_KEY);
   }
 
   async send(message: EmailMessage): Promise<EmailResult> {
     try {
-      const [response] = await sgMail.send({
+      const [response] = await this.client.send({
         from: message.from || getDefaultFromAddress(this.config),
         to: message.to,
         subject: message.subject,
@@ -73,6 +76,16 @@ export class SendGridProvider implements EmailProvider {
         success: false,
         error: getErrorMessage(error),
       };
+    }
+  }
+
+  async verify(): Promise<boolean> {
+    try {
+      const isolatedClient = this.client as unknown as { client: { request(input: { method: string; url: string }): Promise<[{ statusCode: number }]> } };
+      const [response] = await isolatedClient.client.request({ method: "GET", url: "/v3/user/profile" });
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch {
+      return false;
     }
   }
 }

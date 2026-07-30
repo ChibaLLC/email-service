@@ -1,5 +1,5 @@
 import mailchimpTransactional from "@mailchimp/mailchimp_transactional";
-import { getDefaultFromAddress, parseEmailProviderConfig, type MailchimpConfig } from "../config";
+import { getDefaultFromAddress, type MailchimpConfig } from "../config";
 import type { EmailAttachment, EmailMessage, EmailProvider, EmailResult } from "../types";
 
 
@@ -23,8 +23,8 @@ export class MailchimpProvider implements EmailProvider {
   private config: MailchimpConfig;
   private client: ReturnType<typeof mailchimpTransactional>;
 
-  constructor() {
-    this.config = parseEmailProviderConfig("mailchimp");
+  constructor(config: MailchimpConfig) {
+    this.config = config;
     this.client = mailchimpTransactional(this.config.MAILCHIMP_TRANSACTIONAL_API_KEY);
   }
 
