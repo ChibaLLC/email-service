@@ -77,8 +77,13 @@ export interface InboundEmailConfigView {
   username: string;
   hasPassword: boolean;
   mailbox: string;
-  webhookUrl: string;
-  hasWebhookSecret: boolean;
+  webhooks: {
+    id: string;
+    name: string;
+    url: string;
+    hasSecret: boolean;
+    senderFilters: string[];
+  }[];
   pollIntervalSeconds: number;
   status: {
     uidValidity: string | null;

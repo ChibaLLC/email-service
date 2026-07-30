@@ -2,13 +2,14 @@ import { createHash } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { ImapFlow } from "imapflow";
-import { and, asc, count, eq, isNull, lt, lte } from "drizzle-orm";
+import { and, asc, count, countDistinct, eq, isNotNull, isNull, lt, lte, notExists } from "drizzle-orm";
 import { consola } from "consola";
 import { ulid } from "ulid";
 import { db, pool, schema } from "../database";
 import { getInboundConfig, getInboundEncryptionKey } from "./config";
 import { createWebhookSignature, decryptInboundValue, encryptInboundValue } from "./crypto";
 import { assertSafeWebhookDestination } from "./network";
+import { matchesSenderFilters } from "./filters";
 import type { InboundConfig, InboundWebhookPayload } from "./types";
 
 const STATE_ID = "primary";
@@ -67,6 +68,10 @@ async function recordOversizedMessage(
     internalDate?: Date | string;
   },
 ) {
+  const webhooks = config.webhooks.filter((webhook) =>
+    matchesSenderFilters(message.envelope?.from?.[0]?.address, webhook.senderFilters),
+  );
+  if (webhooks.length === 0) return;
   const messageId = ulid();
   await db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -87,18 +92,28 @@ async function recordOversizedMessage(
       .onConflictDoNothing()
       .returning({ id: schema.inboundMessages.id });
     if (!inserted) return;
-    await tx.insert(schema.inboundWebhookDeliveries).values({
-      messageId,
-      status: "failed",
-      attempts: 0,
-      lastError: `Message exceeds ${MAX_RAW_SIZE} byte inbound limit`,
-    });
+    await tx.insert(schema.inboundWebhookDeliveries).values(
+      webhooks.map((webhook) => ({
+        messageId,
+        webhookId: webhook.id,
+        webhookName: webhook.name,
+        webhookUrl: webhook.url,
+        webhookSecretEncrypted: encryptInboundValue(
+          webhook.secret,
+          getInboundEncryptionKey(),
+          "inbound-config:webhook-secret",
+        ),
+        status: "failed" as const,
+        attempts: 0,
+        lastError: `Message exceeds ${MAX_RAW_SIZE} byte inbound limit`,
+      })),
+    );
   });
 }
 
 async function ingestMailbox(config: InboundConfig) {
   const [pending] = await db
-    .select({ count: count() })
+    .select({ count: countDistinct(schema.inboundWebhookDeliveries.messageId) })
     .from(schema.inboundWebhookDeliveries)
     .where(eq(schema.inboundWebhookDeliveries.status, "pending"));
   const availableCapacity = MAX_PENDING_MESSAGES - Number(pending?.count || 0);
@@ -138,10 +153,7 @@ async function ingestMailbox(config: InboundConfig) {
     }
 
     const firstUid = state.lastUid + 1;
-    const finalUid = Math.min(
-      mailbox.uidNext - 1,
-      firstUid + Math.min(FETCH_BATCH_SIZE, availableCapacity) - 1,
-    );
+    const finalUid = Math.min(mailbox.uidNext - 1, firstUid + Math.min(FETCH_BATCH_SIZE, availableCapacity) - 1);
     if (finalUid < firstUid) {
       await db
         .update(schema.inboundRuntimeState)
@@ -160,6 +172,13 @@ async function ingestMailbox(config: InboundConfig) {
       const rawSize = message.size || message.source?.length || 0;
       if (!message.source || rawSize > MAX_RAW_SIZE || message.source.length > MAX_RAW_SIZE) {
         await recordOversizedMessage(config, fingerprint, uidValidity, message);
+        lastUid = Math.max(lastUid, message.uid);
+        continue;
+      }
+
+      const sender = message.envelope?.from?.[0]?.address;
+      const webhooks = config.webhooks.filter((webhook) => matchesSenderFilters(sender, webhook.senderFilters));
+      if (webhooks.length === 0) {
         lastUid = Math.max(lastUid, message.uid);
         continue;
       }
@@ -184,7 +203,17 @@ async function ingestMailbox(config: InboundConfig) {
           })
           .onConflictDoNothing()
           .returning({ id: schema.inboundMessages.id });
-        if (inserted) await tx.insert(schema.inboundWebhookDeliveries).values({ messageId: inboundMessageId });
+        if (inserted) {
+          await tx.insert(schema.inboundWebhookDeliveries).values(
+            webhooks.map((webhook) => ({
+              messageId: inboundMessageId,
+              webhookId: webhook.id,
+              webhookName: webhook.name,
+              webhookUrl: webhook.url,
+              webhookSecretEncrypted: encryptInboundValue(webhook.secret, key, "inbound-config:webhook-secret"),
+            })),
+          );
+        }
       });
       lastUid = Math.max(lastUid, message.uid);
     }
@@ -235,7 +264,34 @@ async function postWebhook(
   });
 }
 
-async function deliverPending(config: InboundConfig) {
+export async function verifyInboundWebhook(webhookId: string) {
+  const config = await getInboundConfig();
+  if (!config) throw new Error("Inbound email ingestion is disabled");
+  const webhook = config.webhooks.find((candidate) => candidate.id === webhookId);
+  if (!webhook) throw new Error("Webhook destination was not found");
+  const timestamp = Math.floor(Date.now() / 1_000).toString();
+  const body = JSON.stringify({
+    type: "email.received.test",
+    version: 1,
+    webhook: webhook.name,
+    occurredAt: new Date().toISOString(),
+  });
+  const status = await postWebhook(
+    await assertSafeWebhookDestination(webhook.url),
+    {
+      "content-type": "application/json",
+      "content-length": String(Buffer.byteLength(body)),
+      "x-email-service-event": "email.received.test",
+      "x-email-service-timestamp": timestamp,
+      "x-email-service-signature": createWebhookSignature(webhook.secret, timestamp, body),
+    },
+    body,
+  );
+  if (status < 200 || status >= 300) throw new Error(`Webhook returned HTTP ${status}`);
+  return { status };
+}
+
+async function deliverPending() {
   const rows = await db
     .select({ delivery: schema.inboundWebhookDeliveries, message: schema.inboundMessages })
     .from(schema.inboundWebhookDeliveries)
@@ -274,7 +330,14 @@ async function deliverPending(config: InboundConfig) {
       };
       const body = JSON.stringify(payload);
       const timestamp = Math.floor(Date.now() / 1_000).toString();
-      const destination = await assertSafeWebhookDestination(config.webhookUrl);
+      if (!delivery.webhookUrl || !delivery.webhookSecretEncrypted)
+        throw new Error("Webhook destination is unavailable");
+      const destination = await assertSafeWebhookDestination(delivery.webhookUrl);
+      const webhookSecret = decryptInboundValue(
+        delivery.webhookSecretEncrypted,
+        getInboundEncryptionKey(),
+        "inbound-config:webhook-secret",
+      ).toString();
       responseStatus = await postWebhook(
         destination,
         {
@@ -283,7 +346,7 @@ async function deliverPending(config: InboundConfig) {
           "idempotency-key": message.id,
           "x-email-service-event": "email.received",
           "x-email-service-timestamp": timestamp,
-          "x-email-service-signature": createWebhookSignature(config.webhookSecret, timestamp, body),
+          "x-email-service-signature": createWebhookSignature(webhookSecret, timestamp, body),
         },
         body,
       );
@@ -303,10 +366,21 @@ async function deliverPending(config: InboundConfig) {
             updatedAt: new Date(),
           })
           .where(eq(schema.inboundWebhookDeliveries.id, delivery.id));
-        await tx
-          .update(schema.inboundMessages)
-          .set({ rawEncrypted: null })
-          .where(eq(schema.inboundMessages.id, message.id));
+        const [pending] = await tx
+          .select({ count: count() })
+          .from(schema.inboundWebhookDeliveries)
+          .where(
+            and(
+              eq(schema.inboundWebhookDeliveries.messageId, message.id),
+              eq(schema.inboundWebhookDeliveries.status, "pending"),
+            ),
+          );
+        if (Number(pending?.count || 0) === 0) {
+          await tx
+            .update(schema.inboundMessages)
+            .set({ rawEncrypted: null })
+            .where(eq(schema.inboundMessages.id, message.id));
+        }
       });
     } catch (error) {
       await db
@@ -352,12 +426,43 @@ async function cleanupInboundHistory() {
           updatedAt: new Date(),
         })
         .where(eq(schema.inboundWebhookDeliveries.id, row.deliveryId));
-      await tx
-        .update(schema.inboundMessages)
-        .set({ rawEncrypted: null })
-        .where(eq(schema.inboundMessages.id, row.messageId));
+      const [pending] = await tx
+        .select({ count: count() })
+        .from(schema.inboundWebhookDeliveries)
+        .where(
+          and(
+            eq(schema.inboundWebhookDeliveries.messageId, row.messageId),
+            eq(schema.inboundWebhookDeliveries.status, "pending"),
+          ),
+        );
+      if (Number(pending?.count || 0) === 0) {
+        await tx
+          .update(schema.inboundMessages)
+          .set({ rawEncrypted: null })
+          .where(eq(schema.inboundMessages.id, row.messageId));
+      }
     });
   }
+
+  await db
+    .update(schema.inboundMessages)
+    .set({ rawEncrypted: null })
+    .where(
+      and(
+        isNotNull(schema.inboundMessages.rawEncrypted),
+        notExists(
+          db
+            .select({ id: schema.inboundWebhookDeliveries.id })
+            .from(schema.inboundWebhookDeliveries)
+            .where(
+              and(
+                eq(schema.inboundWebhookDeliveries.messageId, schema.inboundMessages.id),
+                eq(schema.inboundWebhookDeliveries.status, "pending"),
+              ),
+            ),
+        ),
+      ),
+    );
 
   await db
     .delete(schema.inboundMessages)
@@ -406,9 +511,9 @@ export async function runInboundCycle(): Promise<number> {
         return 30;
       }
       if (!config) return 30;
-      await deliverPending(config);
+      await deliverPending();
       await ingestMailbox(config);
-      await deliverPending(config);
+      await deliverPending();
     } catch (error) {
       logger.error("Inbound email cycle failed", error);
       await updateRuntimeError(error);

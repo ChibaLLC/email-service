@@ -1,5 +1,13 @@
 export type InboundConfigSource = "database";
 
+export interface InboundWebhook {
+  id: string;
+  name: string;
+  url: string;
+  secret: string;
+  senderFilters: string[];
+}
+
 export interface InboundConfig {
   enabled: true;
   source: InboundConfigSource;
@@ -9,8 +17,7 @@ export interface InboundConfig {
   username: string;
   password: string;
   mailbox: string;
-  webhookUrl: string;
-  webhookSecret: string;
+  webhooks: InboundWebhook[];
   pollIntervalSeconds: number;
 }
 
@@ -22,8 +29,13 @@ export interface InboundConfigInput {
   username: string;
   password?: string;
   mailbox: string;
-  webhookUrl: string;
-  webhookSecret?: string;
+  webhooks: {
+    id?: string;
+    name: string;
+    url: string;
+    secret?: string;
+    senderFilters: string[];
+  }[];
   pollIntervalSeconds: number;
 }
 
