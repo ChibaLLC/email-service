@@ -1,88 +1,72 @@
 <template>
-  <div class="min-h-screen bg-gray-950 text-white">
-    <header class="border-b border-gray-800 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16 gap-4">
-        <div class="flex items-center gap-3">
-          <UButton to="/dashboard" variant="ghost" color="neutral" icon="i-material-symbols-light-arrow-back">
-            Back
-          </UButton>
-          <div>
-            <h1 class="text-lg font-bold">Listmonk</h1>
-            <p class="text-sm text-gray-400">Dashboard access through the authenticated Listmonk proxy.</p>
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-semibold">Listmonk</h1>
+      <p class="mt-1 text-sm text-gray-400">Configure the authenticated server-side connection and inspect proxy responses.</p>
+    </div>
+
+    <section class="rounded-xl bg-white/5 p-5 ring-1 ring-gray-800">
+      <div class="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="font-medium">Connection</h2>
+            <UBadge :color="settingsForm.enabled ? 'success' : 'neutral'" variant="subtle">{{ settingsForm.enabled ? "Enabled" : "Disabled" }}</UBadge>
           </div>
+          <p class="mt-1 text-sm text-gray-500">Credentials stay on the server and are never returned to the browser.</p>
         </div>
-
-        <UButton
-          variant="subtle"
-          color="primary"
-          icon="i-material-symbols-light-refresh"
-          :loading="loading"
-          @click="loadEndpoint"
-        >
-          Refresh
-        </UButton>
+        <UButton color="neutral" variant="soft" icon="i-material-symbols-light-cable" :loading="testing" :disabled="!settingsForm.enabled" @click="testConnection">Test</UButton>
       </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <div class="rounded-xl bg-white/5 ring-1 ring-gray-800 p-5 space-y-5">
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            v-for="preset in presets"
-            :key="preset.path"
-            :variant="selectedPath === preset.path ? 'solid' : 'ghost'"
-            :color="selectedPath === preset.path ? 'primary' : 'neutral'"
-            @click="selectPreset(preset.path)"
-          >
-            {{ preset.label }}
-          </UButton>
+      <form class="space-y-4" @submit.prevent="saveSettings">
+        <div class="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950/30 p-4">
+          <div><p class="font-medium">Enable Listmonk</p><p class="text-sm text-gray-500">Allow requests through the dashboard proxy.</p></div>
+          <USwitch v-model="settingsForm.enabled" />
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
-          <UFormField label="Proxy path" help="This is appended to /api/dashboard/listmonk.">
-            <UInput v-model="selectedPath" placeholder="/lists" class="w-full" />
+        <div class="grid gap-4 md:grid-cols-2">
+          <UFormField label="Listmonk URL" class="md:col-span-2"><UInput v-model="settingsForm.url" type="url" class="w-full" placeholder="https://listmonk.example.com" /></UFormField>
+          <UFormField label="Username"><UInput v-model="settingsForm.username" class="w-full" autocomplete="username" /></UFormField>
+          <UFormField label="Password">
+            <UInput v-model="settingsForm.password" type="password" class="w-full" autocomplete="new-password" :placeholder="settings?.hasPassword ? 'Leave blank to keep current password' : 'Enter password'" />
           </UFormField>
-          <UButton color="primary" :loading="loading" @click="loadEndpoint">
-            Load
-          </UButton>
         </div>
+        <div class="flex justify-end"><UButton type="submit" icon="i-material-symbols-light-save-outline" :loading="saving">Save connection</UButton></div>
+      </form>
+    </section>
 
-        <div class="rounded-lg bg-gray-900/70 ring-1 ring-gray-800 px-4 py-3 text-sm text-gray-300">
-          <span class="text-gray-500">Request:</span>
-          <span class="font-mono">GET /api/dashboard/listmonk{{ normalizedPath }}</span>
-        </div>
+    <section class="rounded-xl bg-white/5 p-5 ring-1 ring-gray-800">
+      <div class="mb-4 flex flex-wrap gap-2">
+        <UButton v-for="preset in presets" :key="preset.path" :variant="selectedPath === preset.path ? 'solid' : 'ghost'" :color="selectedPath === preset.path ? 'primary' : 'neutral'" @click="selectPreset(preset.path)">{{ preset.label }}</UButton>
       </div>
-
-      <div v-if="errorMessage" class="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-4 text-sm text-red-200">
-        {{ errorMessage }}
+      <div class="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <UFormField label="Proxy path" help="Appended to /api/dashboard/listmonk."><UInput v-model="selectedPath" class="w-full" placeholder="/lists" /></UFormField>
+        <UButton :loading="loading" @click="loadEndpoint">Load</UButton>
       </div>
+      <p class="mt-3 rounded-lg bg-gray-950/60 px-4 py-3 font-mono text-xs text-gray-400">GET /api/dashboard/listmonk{{ normalizedPath }}</p>
+    </section>
 
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div class="rounded-xl bg-white/5 ring-1 ring-gray-800 p-5 space-y-3">
-          <h2 class="text-sm font-medium text-gray-400">Quick Notes</h2>
-          <p class="text-sm text-gray-300">Requests on this page stay inside the dashboard session and go through the server-side proxy.</p>
-          <p class="text-sm text-gray-300">Use it to inspect Listmonk resources without exposing API credentials in the browser.</p>
-          <p class="text-xs text-gray-500">The proxy forwards to <span class="font-mono">LISTMONK_API_URL/api/**</span>.</p>
-        </div>
-
-        <div class="lg:col-span-3 rounded-xl bg-white/5 ring-1 ring-gray-800 p-5 space-y-4 overflow-hidden">
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-sm font-medium text-gray-400">Response</h2>
-            <UBadge variant="subtle" color="neutral">{{ loading ? 'Loading' : 'Ready' }}</UBadge>
-          </div>
-
-          <CodeBlock :code="responsePreview" lang="json" />
-        </div>
+    <UAlert v-if="errorMessage" color="error" variant="subtle" title="Listmonk request failed" :description="errorMessage" />
+    <section class="overflow-hidden rounded-xl bg-white/5 ring-1 ring-gray-800">
+      <div class="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+        <h2 class="font-medium">Proxy response</h2>
+        <UBadge color="neutral" variant="subtle">{{ loading ? "Loading" : "Ready" }}</UBadge>
       </div>
-    </main>
+      <div class="p-5"><CodeBlock :code="responsePreview" lang="json" /></div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: false, middleware: ["auth"] });
+type ListmonkSettings = { enabled: boolean; url?: string; baseUrl?: string; username: string; hasPassword: boolean };
+
+definePageMeta({ layout: "dashboard", middleware: ["auth"] });
 
 const toast = useToast();
-
+const saving = ref(false);
+const testing = ref(false);
+const loading = ref(false);
+const errorMessage = ref("");
+const selectedPath = ref("/lists");
+const responseData = ref<unknown>(null);
+const settingsForm = reactive({ enabled: false, url: "", username: "", password: "" });
 const presets = [
   { label: "Lists", path: "/lists" },
   { label: "Subscribers", path: "/subscribers" },
@@ -90,44 +74,53 @@ const presets = [
   { label: "Transactional", path: "/tx" },
 ];
 
-const selectedPath = ref("/lists");
-const loading = ref(false);
-const errorMessage = ref("");
-const responseData = ref<unknown>(null);
+const { data: settings, refresh: refreshSettings } = await useFetch<ListmonkSettings>("/api/dashboard/settings/listmonk");
+watch(settings, (value) => {
+  if (value) Object.assign(settingsForm, { enabled: value.enabled, url: value.url || value.baseUrl || "", username: value.username, password: "" });
+}, { immediate: true });
 
 const normalizedPath = computed(() => {
-  const trimmed = selectedPath.value.trim();
-  if (!trimmed) return "/lists";
-  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  const path = selectedPath.value.trim() || "/lists";
+  return path.startsWith("/") ? path : `/${path}`;
 });
+const responsePreview = computed(() => responseData.value === null ? '{\n  "message": "No response loaded yet."\n}' : JSON.stringify(responseData.value, null, 2));
 
-const responsePreview = computed(() => {
-  if (responseData.value === null) {
-    return '{\n  "message": "No response loaded yet."\n}';
+function selectPreset(path: string) { selectedPath.value = path; void loadEndpoint(); }
+async function saveSettings() {
+  saving.value = true;
+  try {
+    await $fetch("/api/dashboard/settings/listmonk", {
+      method: "PUT",
+      body: { enabled: settingsForm.enabled, url: settingsForm.url, baseUrl: settingsForm.url, username: settingsForm.username, password: settingsForm.password || undefined },
+    });
+    settingsForm.password = "";
+    await refreshSettings();
+    toast.add({ title: "Listmonk connection saved" });
+  } catch (error: any) {
+    toast.add({ title: "Could not save Listmonk settings", description: error.data?.message || "Check the connection values.", color: "error" });
+  } finally {
+    saving.value = false;
   }
-
-  return JSON.stringify(responseData.value, null, 2);
-});
-
-function selectPreset(path: string) {
-  selectedPath.value = path;
-  void loadEndpoint();
 }
-
+async function testConnection() {
+  testing.value = true;
+  try {
+    await $fetch("/api/dashboard/settings/listmonk/test", { method: "POST" });
+    toast.add({ title: "Listmonk connection succeeded" });
+  } catch (error: any) {
+    toast.add({ title: "Listmonk connection failed", description: error.data?.message || "Listmonk could not be reached.", color: "error" });
+  } finally {
+    testing.value = false;
+  }
+}
 async function loadEndpoint() {
   loading.value = true;
   errorMessage.value = "";
-
   try {
     responseData.value = await $fetch(`/api/dashboard/listmonk${normalizedPath.value}`);
   } catch (error: any) {
     responseData.value = null;
-    errorMessage.value = error?.data?.message || error?.message || "Failed to load the Listmonk endpoint.";
-    toast.add({
-      title: "Listmonk request failed",
-      description: errorMessage.value,
-      color: "error",
-    });
+    errorMessage.value = error.data?.message || error.message || "Failed to load the Listmonk endpoint.";
   } finally {
     loading.value = false;
   }
