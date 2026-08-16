@@ -5,16 +5,28 @@
         <Icon name="material-symbols-light:dashboard-outline" class="mx-auto size-10 text-lime-400" />
         <h1 class="text-xl font-bold text-white mt-2">Dashboard</h1>
         <p class="text-sm text-gray-400 mt-1">
-          {{ step === "email" ? "Sign in with your company email" : `Enter the code sent to ${email}` }}
+          {{ setupMode ? "Configure a new installation" : step === "email" ? "Sign in with your company email" : `Enter the code sent to ${email}` }}
         </p>
       </div>
 
       <!-- Step 1: Email -->
-      <form v-if="step === 'email'" @submit.prevent="sendOTP" class="space-y-4">
+      <form v-if="setupMode" @submit.prevent="bootstrapDashboard" class="space-y-4">
+        <UFormField label="Owner email" name="email">
+          <UInput v-model="email" type="email" placeholder="owner@example.com" class="w-full" />
+        </UFormField>
+        <UFormField label="Setup code" name="setupCode" help="Find the one-time code in the application startup logs.">
+          <UInput v-model="setupCode" type="password" autocomplete="off" placeholder="One-time setup code" class="w-full" />
+        </UFormField>
+        <UButton type="submit" block :loading="loading" color="primary"> Open Setup Dashboard </UButton>
+        <UButton variant="ghost" block color="neutral" @click="closeSetup"> Back to email login </UButton>
+      </form>
+
+      <form v-else-if="step === 'email'" @submit.prevent="sendOTP" class="space-y-4">
         <UFormField label="Email" name="email">
           <UInput v-model="email" type="email" placeholder="you@company.com" class="w-full" />
         </UFormField>
         <UButton type="submit" block :loading="loading" color="primary"> Send Verification Code </UButton>
+        <UButton variant="ghost" block color="neutral" @click="openSetup"> First-time setup </UButton>
       </form>
 
       <!-- Step 2: OTP Code -->
@@ -39,12 +51,22 @@ definePageMeta({ layout: false, middleware: ["guest"] });
 
 const email = ref("");
 const code = ref("");
+const setupCode = ref("");
+const setupMode = ref(false);
 const step = ref<"email" | "code">("email");
 const loading = ref(false);
 const toast = useToast();
 
 function useDifferentEmail() {
   step.value = "email";
+}
+
+function openSetup() {
+  setupMode.value = true;
+}
+
+function closeSetup() {
+  setupMode.value = false;
 }
 
 async function sendOTP() {
@@ -85,6 +107,27 @@ async function verifyCode() {
     toast.add({
       title: "Verification failed",
       description: e.data?.message || "Invalid or expired code",
+      color: "error",
+    });
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function bootstrapDashboard() {
+  if (!email.value || !setupCode.value) return;
+  loading.value = true;
+  try {
+    await $fetch("/api/dashboard/bootstrap", {
+      method: "POST",
+      body: { email: email.value, code: setupCode.value },
+    });
+    setupCode.value = "";
+    await navigateTo("/dashboard/outbound");
+  } catch (e: any) {
+    toast.add({
+      title: "Setup failed",
+      description: e.data?.message || "Invalid owner email or setup code",
       color: "error",
     });
   } finally {

@@ -8,10 +8,15 @@ export default defineEventHandler(async (event) => {
   // Routes that require dashboard authentication
   const protectedPrefixes = ["/api/dashboard", "/api/keys"];
   // Routes that are exempt from auth (login/verify/logout)
-  const publicPaths = ["/api/dashboard/login", "/api/dashboard/verify", "/api/dashboard/logout"];
+  const publicPaths = [
+    "/api/dashboard/bootstrap",
+    "/api/dashboard/login",
+    "/api/dashboard/verify",
+    "/api/dashboard/logout",
+  ];
 
   const isProtected = protectedPrefixes.some((p) => path.startsWith(p));
-  const isPublic = publicPaths.some((p) => path.startsWith(p));
+  const isPublic = publicPaths.includes(path);
 
   if (!isProtected || isPublic) return;
 
