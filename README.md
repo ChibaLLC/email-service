@@ -265,7 +265,9 @@ See [docs/stalwart/README.md](docs/stalwart/README.md).
 
 ## Outbound Provider Settings
 
-Outbound provider selection, sender details, SMTP credentials, and provider API keys are database-only settings managed in `/dashboard/outbound`. Secrets are encrypted with `SETTINGS_ENCRYPTION_KEY` and never returned to the browser. Each save creates an immutable revision; new messages use the active revision while queued retries remain pinned to the revision with which they were created. The server remains available for initial dashboard configuration when no provider is active, but sending and OTP login are unavailable until an owner or administrator activates one.
+Outbound provider selection, sender details, SMTP credentials, and provider API keys are database-only settings managed in `/dashboard/outbound`. Secrets are encrypted with `SETTINGS_ENCRYPTION_KEY` and never returned to the browser. Each save creates an immutable revision; new messages use the active revision while queued retries remain pinned to the revision with which they were created.
+
+When no provider is active, startup logs contain a one-time dashboard setup code. Open `/dashboard/login`, choose **First-time setup**, and enter that code with an owner email from `DASHBOARD_ADMIN_EMAILS`. The code is derived from a random Redis nonce and `SETTINGS_ENCRYPTION_KEY`, is never stored directly, expires after one hour, and is consumed atomically after one successful use. Restart the service to issue a new code after expiration. Configure outbound email in `/dashboard/outbound`; normal OTP login and API-key delivery become available afterward.
 
 ## Dashboard Test Email
 

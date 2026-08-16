@@ -114,6 +114,10 @@ export async function isApiKeyEmailAllowed(email: string): Promise<boolean> {
   return emailMatchesDomains(email, (await getAccessSettings()).apiKeyDomains);
 }
 
+export function isDashboardBootstrapOwner(email: string): boolean {
+  return parseEnvList(env.DASHBOARD_ADMIN_EMAILS).includes(email.trim().toLowerCase());
+}
+
 export function getDashboardEmail(event: H3Event): string {
   const email = (event.context as { dashboardUser?: { email?: string } }).dashboardUser?.email?.trim().toLowerCase();
   if (!email) throw createError({ statusCode: 401, message: "Dashboard authentication required" });
