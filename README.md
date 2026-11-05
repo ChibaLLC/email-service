@@ -240,7 +240,7 @@ It can also run in the same deployment as Postal when you want separate mail rol
 
 Additionally, an integrated JMAP webmail client is bundled in the Stalwart compose overlay. **[Bulwark](https://bulwarkmail.org)** is the default — a modern, feature-rich Next.js webmail supporting email, calendar, contacts, files, OAuth2/OIDC, and more. It is served via `docker-compose.bulwark.yml` and configured through `BULWARK_*` env vars.
 
-The alternative **Twake Mail (`tmail-web`)** is also available in the Stalwart compose overlay. To switch to it, comment out `bulwark-web` in `docker-compose.prod.yml` and uncomment `tmail-web`. See [docs/stalwart/README.md](docs/stalwart/README.md) for details.
+Both the Stalwart-only and production Compose stacks start Bulwark. See [docs/stalwart/README.md](docs/stalwart/README.md) for HTTPS routing and replacing an existing Twake container.
 
 ### CORS Configuration
 If you run the webmail client on a custom port or domain, you must configure CORS origins in your `.env` via `STALWART_HTTP_CORS_ALLOWED_ORIGINS`.

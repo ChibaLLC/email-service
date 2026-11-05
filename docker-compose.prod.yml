@@ -67,13 +67,6 @@ services:
       file: docker-compose.bulwark.yml
       service: bulwark-web
 
-  # Twake Mail (tmail-web) is an alternative webmail client.
-  # To use it instead of Bulwark, uncomment this block (and comment out bulwark-web above).
-  # tmail-web:
-  #   extends:
-  #     file: docker-compose.stalwart.yml
-  #     service: tmail-web
-
   postal-config:
     extends:
       file: docker-compose.postal.yml
@@ -126,6 +119,8 @@ services:
       - libredesk-redis
 
 volumes:
+  bulwark_data:
+  stalwart_config:
   postgres_data:
   redis_data:
   listmonk_db_data:

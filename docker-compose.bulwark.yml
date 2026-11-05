@@ -5,10 +5,12 @@
 #
 # Requires:
 #   - A running Stalwart (or other JMAP-compatible) mail server
-#   - BULWARK_JMAP_SERVER_URL pointing to the Stalwart internal URL
+#   - BULWARK_JMAP_SERVER_URL reachable from browsers and the container
 #
 # Usage with the prod stack:
 #   docker compose -f docker-compose.prod.yml up -d
+# Stalwart + Bulwark only:
+#   docker compose -f docker-compose.stalwart.yml up -d
 #
 # To update the image:
 #   docker compose -f docker-compose.bulwark.yml pull bulwark-web
@@ -57,9 +59,8 @@ services:
       - PORT=${BULWARK_PORT:-3000}
 
       # ── JMAP backend (required) ──────────────────────────────────────────────
-      # Internal Docker URL of Stalwart's HTTP/JMAP endpoint. When Stalwart
-      # runs on port 8080 in the same Compose network, use the service name.
-      - JMAP_SERVER_URL=${BULWARK_JMAP_SERVER_URL:-http://stalwart:8080}
+      # Public HTTPS URL: both browsers and the container use this endpoint.
+      - JMAP_SERVER_URL=${BULWARK_JMAP_SERVER_URL:-${STALWART_PUBLIC_URL:-https://mail.example.com}}
 
       # Allow users to supply their own JMAP endpoint on the login page.
       # Useful when you want to support multiple mail servers from one instance.
@@ -75,7 +76,7 @@ services:
       # instead of) password-based login.
       # Stalwart has a built-in OAuth server; for Keycloak or Authentik set
       # OAUTH_ISSUER_URL to your provider's discovery endpoint.
-      - OAUTH_ENABLED=${BULWARK_OAUTH_ENABLED:-true}
+      - OAUTH_ENABLED=${BULWARK_OAUTH_ENABLED:-false}
       # Client ID registered in the OAuth provider (e.g. stalwart or keycloak).
       - OAUTH_CLIENT_ID=${BULWARK_OAUTH_CLIENT_ID:-webmail}
       # Client secret — leave empty for public (PKCE) clients.
@@ -94,6 +95,10 @@ services:
       # Company name and website link shown on the login page.
       - LOGIN_COMPANY_NAME=${BULWARK_LOGIN_COMPANY_NAME:-}
       - LOGIN_WEBSITE_URL=${BULWARK_LOGIN_WEBSITE_URL:-}
+    volumes:
+      - bulwark_data:/app/data
+    ports:
+      - "127.0.0.1:${BULWARK_LOCAL_PORT:-8081}:${BULWARK_PORT:-3000}"
     healthcheck:
       test:
         [
@@ -110,6 +115,8 @@ services:
       start_period: 10s
 
 volumes:
+  bulwark_data:
+  stalwart_config:
   stalwart_data:
   stalwart_db_data:
   stalwart_redis_data:

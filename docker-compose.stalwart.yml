@@ -174,30 +174,13 @@ services:
       - stalwart_config:/etc/stalwart
       - stalwart_data:/var/lib/stalwart
 
-  tmail-web:
-    image: linagora/tmail-web:latest
-    restart: unless-stopped
-    depends_on:
-      stalwart:
-        condition: service_started
-    environment:
-      - STALWART_HOSTNAME=${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
-      - STALWART_WEBMAIL_HOSTNAME=${STALWART_WEBMAIL_HOSTNAME:?STALWART_WEBMAIL_HOSTNAME is required}
-      - STALWART_HTTP_PROTOCOL=${STALWART_HTTP_PROTOCOL:-https}
-    command: |
-      /bin/sh -c "cat <<EOF > /usr/share/nginx/html/assets/env.file
-      SERVER_URL=$$STALWART_HTTP_PROTOCOL://$$STALWART_HOSTNAME
-      DOMAIN_REDIRECT_URL=$$STALWART_HTTP_PROTOCOL://$$STALWART_WEBMAIL_HOSTNAME
-      WEB_OIDC_CLIENT_ID=tmail-web
-      APP_GRID_AVAILABLE=unsupported
-      FCM_AVAILABLE=supported
-      IOS_FCM=supported
-      PLATFORM=other
-      FORCE_EMAIL_QUERY=false
-      EOF
-      exec nginx -g 'daemon off;'"
+  bulwark-web:
+    extends:
+      file: docker-compose.bulwark.yml
+      service: bulwark-web
 
 volumes:
+  bulwark_data:
   stalwart_config:
   stalwart_data:
   stalwart_db_data:

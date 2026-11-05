@@ -71,21 +71,57 @@ Use those credentials to sign in to the Stalwart web UI.
 
 If you are trying to access the web UI from outside Docker, you need one of these setups:
 
-- publish `8080` or `443` from the `stalwart` service to the host
+- publish HTTPS port `443` from the `stalwart` service to the host
 - route a public hostname to the internal Stalwart web port through your reverse proxy
 
 ## Webmail Client
 
 This setup includes a JMAP webmail client. **[Bulwark](https://bulwarkmail.org)** is the default — a modern, self-hosted Next.js webmail built for Stalwart. It provides email, calendar, contacts, file management, S/MIME, OAuth2/OIDC, and more.
 
-Bulwark is configured via `docker-compose.bulwark.yml` and the `BULWARK_*` env vars in [.env.example](../../.env.example). It listens on the hostname specified by `BULWARK_WEBMAIL_HOSTNAME` and talks to Stalwart over the internal Docker network via `BULWARK_JMAP_SERVER_URL` (defaults to `http://stalwart:8080`).
+Both `docker-compose.stalwart.yml` and `docker-compose.prod.yml` start Bulwark. Its service definition lives in `docker-compose.bulwark.yml`, and settings persist in the `bulwark_data` volume at `/app/data`.
 
-The alternative **Twake Mail (`tmail-web`)** is a lightweight JMAP webmail from Linagora, available in `docker-compose.stalwart.yml`. To switch to it:
+Set `BULWARK_SESSION_SECRET` to a random secret (`openssl rand -base64 32`) and `BULWARK_JMAP_SERVER_URL` to Stalwart's public HTTPS URL, such as `https://mail.example.com`. The endpoint must be reachable from both browsers and the Bulwark container, with a trusted certificate. A Docker-only hostname such as `http://stalwart:8080` is unsuitable for browser requests.
 
-1. Comment out `bulwark-web` in `docker-compose.prod.yml`
-2. Uncomment the `tmail-web` block beneath it
+Password login is enabled by default. Enable OAuth only after registering a client and configuring its redirect URLs and `BULWARK_OAUTH_CLIENT_ID`.
 
-`tmail-web` uses `STALWART_WEBMAIL_HOSTNAME` and `STALWART_HTTP_PROTOCOL` from `.env`.
+### HTTPS with an existing Traefik / Dokploy
+
+Point the mail and webmail DNS names at the server. Use DNS-only records when the mail hostname also serves SMTP/IMAP. Configure:
+
+```dotenv
+STALWART_HOSTNAME=mail.example.com
+STALWART_PUBLIC_URL=https://mail.example.com
+BULWARK_JMAP_SERVER_URL=https://mail.example.com
+BULWARK_WEBMAIL_HOSTNAME=webmail.example.com
+BULWARK_TRAEFIK_DOCKER_NETWORK=dokploy-network
+BULWARK_TRAEFIK_HTTPS_ENTRYPOINT=websecure
+BULWARK_TRAEFIK_CERTRESOLVER=letsencrypt
+```
+
+With Compose 2.24.4 or newer:
+
+```bash
+docker compose -f docker-compose.stalwart.yml -f docker-compose.webmail-traefik.yml up -d
+```
+
+The proxy network must already exist and contain Traefik. Traefik must have the named entrypoint and certificate resolver configured, with ports 80/443 reachable for HTTP-01 certificate issuance. This overlay replaces the base TCP passthrough labels, terminates HTTPS at Traefik, and forwards HTTP to Stalwart on 8080 and Bulwark on 3000. Mail protocols remain directly published by Stalwart and need their own TLS configuration.
+
+Open `https://mail.example.com/admin` for Stalwart and `https://webmail.example.com` for Bulwark. Normal Stalwart WebUI login requires its public HTTPS hostname; forwarding HTTP port 8080 is sufficient only for bootstrap or recovery. Recovery mode stops mail services and should not be used for ordinary access.
+
+If Stalwart resets proxy connections or Traefik returns 502, inspect Settings → Security → Blocked IPs. Add Traefik's exact container IP to Allowed IPs, remove its blocked entry, and run the ReloadBlockedIps action. Recheck this address if Traefik is recreated; do not disable auto-ban globally or allow the entire public network.
+
+Bulwark also publishes a loopback-only diagnostic endpoint at `127.0.0.1:8081` (`BULWARK_LOCAL_PORT`). Its container health endpoint is `/api/health`.
+
+### Replacing an existing Twake container
+
+Start and verify Bulwark first, then stop the old container using its actual project name:
+
+```bash
+docker compose -f docker-compose.stalwart.yml -f docker-compose.webmail-traefik.yml up -d --no-deps bulwark-web
+docker stop <project>-tmail-web-1
+```
+
+The new Compose definition no longer starts Twake. Avoid `down -v`; existing Stalwart mail and database volumes must be preserved.
 
 ### CORS Configuration
 
