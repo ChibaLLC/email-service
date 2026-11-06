@@ -1,0 +1,15 @@
+# Add after docker-compose.prod.yml and docker-compose.webmail-traefik.yml.
+services:
+  app:
+    networks:
+      - default
+      - webmail-proxy
+    labels:
+      - traefik.enable=true
+      - "traefik.docker.network=${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}"
+      - "traefik.http.routers.email-app.rule=Host(`${EMAIL_APP_HOSTNAME:?EMAIL_APP_HOSTNAME is required}`)"
+      - "traefik.http.routers.email-app.entrypoints=${BULWARK_TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      - traefik.http.routers.email-app.tls=true
+      - "traefik.http.routers.email-app.tls.certresolver=${BULWARK_TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - traefik.http.routers.email-app.service=email-app
+      - traefik.http.services.email-app.loadbalancer.server.port=3000
