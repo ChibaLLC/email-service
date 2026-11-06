@@ -219,3 +219,39 @@ records. Set the server provider's reverse DNS/PTR to the public mail hostname.
 References: [Stalwart installation](https://stalw.art/docs/install/platform/docker/),
 [settings reload](https://stalw.art/docs/management/tasks-actions/actions/),
 [Garage administration](https://garagehq.deuxfleurs.fr/documentation/reference-manual/admin-api/).
+
+## Email app behind the same proxy
+
+Set `EMAIL_APP_HOSTNAME=email.example.com`, point its DNS record at the VPS,
+and include `docker-compose.app-traefik.yml` after the mail proxy overlay:
+
+```sh
+docker compose -f docker-compose.prod.yml -f docker-compose.webmail-traefik.yml -f docker-compose.app-traefik.yml up -d --build postgres redis app
+```
+
+For an existing app, restore its PostgreSQL database and preserve `JWT_SECRET`,
+`SETTINGS_ENCRYPTION_KEY` and `INBOUND_CONFIG_ENCRYPTION_KEY` before starting it.
+The encryption keys are required to read stored mail-provider credentials.
+Review pending webhook deliveries before enabling the worker after a restore.
+
+## Reuse Traefik certificates for SMTP and IMAP
+
+Instead of a second ACME provider, the host can periodically copy Traefik's
+issued certificates into Stalwart. Python 3 and Docker access are required.
+The helper reads credentials and private keys in memory without printing them.
+It uses the configured fallback administrator without enabling recovery mode.
+Run after Traefik has issued the certificate:
+
+```sh
+python3 scripts/stalwart/sync-traefik-certificates.py \
+  --hostname mail.example.com --restart-on-change
+```
+
+Repeat `--hostname` for legacy mail aliases that have their own Traefik-issued
+certificate. The first hostname becomes Stalwart's default certificate. Override
+`--traefik-container`, `--acme-path`, `--stalwart-container` and `--api-url` when
+needed. Defaults target Dokploy and the loopback Stalwart HTTP listener.
+Schedule this command hourly with cron or a systemd timer, using absolute paths.
+An unchanged certificate does not restart anything; a renewal briefly restarts
+Stalwart so direct mail listeners load the new certificate. Check the timer's
+logs and verify port 993/465 TLS independently of HTTPS.
