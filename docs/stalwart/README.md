@@ -35,8 +35,11 @@ bucket-scoped S3 key. It reuses them on subsequent runs. Its config, metadata,
 objects and Stalwart credentials have separate persistent volumes. No Garage
 ports are published on the host. The S3 endpoint is `http://stalwart-garage:3900`,
 region `garage`, bucket `stalwart`, unless the corresponding variables are changed.
-`GARAGE_CAPACITY_BYTES` defaults to 10 GB of layout capacity; set it for your disk
-before first initialization. Existing layouts are never resized automatically.
+When `GARAGE_CAPACITY_BYTES` is empty, initialization probes free space on the
+Garage data volume and reserves the larger of 20% of that space or 5 GiB. The
+remaining capacity is rounded down to whole GiB; less than 1 GiB fails explicitly.
+Set a positive byte count to override this calculation. Existing layouts are
+never resized automatically.
 This single-node installation has no storage redundancy: back up the database,
 Garage metadata/data/config and credential volumes together.
 
@@ -216,3 +219,47 @@ records. Set the server provider's reverse DNS/PTR to the public mail hostname.
 References: [Stalwart installation](https://stalw.art/docs/install/platform/docker/),
 [settings reload](https://stalw.art/docs/management/tasks-actions/actions/),
 [Garage administration](https://garagehq.deuxfleurs.fr/documentation/reference-manual/admin-api/).
+
+## Email app behind the same proxy
+
+Set `EMAIL_APP_HOSTNAME=email.example.com`, point its DNS record at the VPS,
+and include `docker-compose.app-traefik.yml` after the mail proxy overlay:
+
+```sh
+docker compose -f docker-compose.prod.yml -f docker-compose.webmail-traefik.yml -f docker-compose.app-traefik.yml up -d --build postgres redis app
+```
+
+For an existing app, restore its PostgreSQL database and preserve `JWT_SECRET`,
+`SETTINGS_ENCRYPTION_KEY` and `INBOUND_CONFIG_ENCRYPTION_KEY` before starting it.
+The encryption keys are required to read stored mail-provider credentials.
+Review pending webhook deliveries before enabling the worker after a restore.
+
+## Reuse Traefik certificates for SMTP and IMAP
+
+Instead of a second ACME provider, the host can periodically copy Traefik's
+issued certificates into Stalwart. Python 3 and Docker access are required.
+The helper reads credentials and private keys in memory without printing them.
+It uses the configured fallback administrator without enabling recovery mode.
+Run after Traefik has issued the certificate:
+
+```sh
+python3 scripts/stalwart/sync-traefik-certificates.py \
+  --hostname mail.example.com --restart-on-change
+```
+
+Repeat `--hostname` for legacy mail aliases that have their own Traefik-issued
+certificate. The first hostname becomes Stalwart's default certificate. Override
+`--traefik-container`, `--acme-path`, `--stalwart-container` and `--api-url` when
+needed. Defaults target Dokploy and the loopback Stalwart HTTP listener.
+Schedule this command hourly with cron or a systemd timer, using absolute paths.
+An unchanged certificate does not restart anything; a renewal briefly restarts
+Stalwart so direct mail listeners load the new certificate. Check the timer's
+logs and verify port 993/465 TLS independently of HTTPS.
+
+When moving an existing app, update its active SMTP settings in the dashboard
+as well as its IMAP account host. Stored provider settings take precedence over
+environment defaults. Use the canonical mail hostname that resolves to Stalwart
+on the app's Docker network and matches its TLS certificate. An old public
+hostname can time out from inside Docker even when it works from your laptop
+if the VPS cannot route traffic back through its own published address.
+Verify SMTP from the app container, then test the dashboard login-email flow.
