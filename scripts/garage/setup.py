@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import sys
 import time
 import urllib.error
@@ -48,6 +49,25 @@ metrics_token = {quoted((directory / "admin-token").read_text().strip())}
     print("Garage configuration ready")
 
 
+
+def initial_capacity():
+    override = os.environ.get("GARAGE_CAPACITY_BYTES", "").strip()
+    if override:
+        capacity = int(override)
+        if capacity <= 0:
+            raise ValueError("GARAGE_CAPACITY_BYTES must be positive")
+        return capacity
+    # Probe the actual object-data mount, not the container's root filesystem.
+    free = shutil.disk_usage("/var/lib/garage/data").free
+    gib = 1024 ** 3
+    reserve = max(5 * gib, (free + 4) // 5)
+    capacity = ((free - reserve) // gib) * gib
+    if capacity < gib:
+        raise RuntimeError("Insufficient free space for automatic Garage capacity; free disk space or set GARAGE_CAPACITY_BYTES explicitly")
+    print(f"Garage initial capacity: {capacity} bytes; reserving at least {reserve} free bytes")
+    return capacity
+
+
 def initialize():
     token = Path(env("GARAGE_CONFIG_DIR", "/etc/garage"), "admin-token").read_text().strip()
     base = env("GARAGE_ADMIN_URL", "http://stalwart-garage:3903").rstrip("/")
@@ -84,9 +104,7 @@ def initialize():
         # staged changes belonging to another cluster deployment.
         if any(role["id"] != node_id for role in layout["stagedRoleChanges"]):
             raise RuntimeError("Unexpected staged Garage layout; inspect it manually")
-        capacity = int(env("GARAGE_CAPACITY_BYTES", "10000000000"))
-        if capacity <= 0:
-            raise ValueError("GARAGE_CAPACITY_BYTES must be positive")
+        capacity = initial_capacity()
         api("UpdateClusterLayout", {"roles": [{
             "id": node_id, "zone": "local", "capacity": capacity, "tags": ["stalwart"],
         }]})

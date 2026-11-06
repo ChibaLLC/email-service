@@ -35,8 +35,11 @@ bucket-scoped S3 key. It reuses them on subsequent runs. Its config, metadata,
 objects and Stalwart credentials have separate persistent volumes. No Garage
 ports are published on the host. The S3 endpoint is `http://stalwart-garage:3900`,
 region `garage`, bucket `stalwart`, unless the corresponding variables are changed.
-`GARAGE_CAPACITY_BYTES` defaults to 10 GB of layout capacity; set it for your disk
-before first initialization. Existing layouts are never resized automatically.
+When `GARAGE_CAPACITY_BYTES` is empty, initialization probes free space on the
+Garage data volume and reserves the larger of 20% of that space or 5 GiB. The
+remaining capacity is rounded down to whole GiB; less than 1 GiB fails explicitly.
+Set a positive byte count to override this calculation. Existing layouts are
+never resized automatically.
 This single-node installation has no storage redundancy: back up the database,
 Garage metadata/data/config and credential volumes together.
 
