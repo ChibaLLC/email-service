@@ -255,3 +255,11 @@ Schedule this command hourly with cron or a systemd timer, using absolute paths.
 An unchanged certificate does not restart anything; a renewal briefly restarts
 Stalwart so direct mail listeners load the new certificate. Check the timer's
 logs and verify port 993/465 TLS independently of HTTPS.
+
+When moving an existing app, update its active SMTP settings in the dashboard
+as well as its IMAP account host. Stored provider settings take precedence over
+environment defaults. Use the canonical mail hostname that resolves to Stalwart
+on the app's Docker network and matches its TLS certificate. An old public
+hostname can time out from inside Docker even when it works from your laptop
+if the VPS cannot route traffic back through its own published address.
+Verify SMTP from the app container, then test the dashboard login-email flow.
