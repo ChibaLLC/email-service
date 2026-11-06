@@ -1,0 +1,41 @@
+# HTTPS termination using an existing Traefik instance (e.g. Dokploy).
+# docker compose -f docker-compose.stalwart.yml -f docker-compose.webmail-traefik.yml up -d
+# Requires Compose 2.24.4+ for !override and an existing external proxy network.
+services:
+  stalwart:
+    networks:
+      - default
+      - webmail-proxy
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Replace the base TCP passthrough routers: this overlay terminates HTTPS
+    # at Traefik and keeps mail protocols on Stalwart's published ports.
+    labels: !override
+      - "traefik.enable=true"
+      - "traefik.docker.network=${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}"
+      - "traefik.http.routers.stalwart-admin.rule=Host(`${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}`)"
+      - "traefik.http.routers.stalwart-admin.entrypoints=${BULWARK_TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.stalwart-admin.tls=true"
+      - "traefik.http.routers.stalwart-admin.tls.certresolver=${BULWARK_TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.stalwart-admin.service=stalwart-http"
+      - "traefik.http.services.stalwart-http.loadbalancer.server.port=8080"
+
+  bulwark-web:
+    networks:
+      - default
+      - webmail-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}"
+      - "traefik.http.routers.bulwark.rule=Host(`${BULWARK_WEBMAIL_HOSTNAME:?BULWARK_WEBMAIL_HOSTNAME is required}`)"
+      - "traefik.http.routers.bulwark.entrypoints=${BULWARK_TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.bulwark.tls=true"
+      - "traefik.http.routers.bulwark.tls.certresolver=${BULWARK_TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.bulwark.service=bulwark"
+      - "traefik.http.services.bulwark.loadbalancer.server.port=${BULWARK_PORT:-3000}"
+
+networks:
+  default:
+  webmail-proxy:
+    external: true
+    name: ${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}

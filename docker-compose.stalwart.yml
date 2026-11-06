@@ -1,5 +1,5 @@
 # Production-oriented Stalwart overlay.
-# Includes dedicated PostgreSQL, Redis, and MinIO services and preconfigures
+# Includes dedicated PostgreSQL, Redis, and Garage services and preconfigures
 # Stalwart to use them from first boot.
 
 services:
@@ -34,86 +34,81 @@ services:
       timeout: 5s
       retries: 10
 
-  stalwart-minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      - MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
-      - MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
-    expose:
-      - "9000"
-      - "9001"
-    volumes:
-      - stalwart_minio_data:/data
-
-  stalwart-minio-init:
-    image: minio/mc:latest
+  stalwart-garage-config:
+    image: python:3.12-alpine
     restart: "no"
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        until mc alias set local http://stalwart-minio:9000 "$$STALWART_MINIO_ROOT_USER" "$$STALWART_MINIO_ROOT_PASSWORD"; do sleep 2; done;
-        mc mb --ignore-existing "local/$$STALWART_MINIO_BUCKET"
+    command: ["python", "/scripts/setup.py", "render"]
+    environment:
+      - STALWART_S3_REGION=${STALWART_S3_REGION:-garage}
+    volumes:
+      - ./scripts/garage:/scripts:ro
+      - stalwart_garage_config:/etc/garage
+
+  stalwart-garage:
+    image: ${GARAGE_IMAGE:-dxflrs/garage:v2.5.0}
+    restart: unless-stopped
+    command: ["/garage", "-c", "/etc/garage/garage.toml", "server"]
     depends_on:
-      stalwart-minio:
+      stalwart-garage-config:
+        condition: service_completed_successfully
+    expose:
+      - "3900"
+    volumes:
+      - stalwart_garage_config:/etc/garage:ro
+      - stalwart_garage_meta:/var/lib/garage/meta
+      - stalwart_garage_data:/var/lib/garage/data
+
+  stalwart-garage-init:
+    image: python:3.12-alpine
+    restart: "no"
+    command: ["python", "/scripts/setup.py", "initialize"]
+    depends_on:
+      stalwart-garage:
         condition: service_started
     environment:
-      - STALWART_MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
-      - STALWART_MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
-      - STALWART_MINIO_BUCKET=${STALWART_MINIO_BUCKET:-stalwart}
+      - STALWART_S3_BUCKET=${STALWART_S3_BUCKET:-stalwart}
+      - GARAGE_CAPACITY_BYTES=${GARAGE_CAPACITY_BYTES:-10000000000}
+      - STALWART_UID=${STALWART_UID:-2000}
+    volumes:
+      - ./scripts/garage:/scripts:ro
+      - stalwart_garage_config:/etc/garage:ro
+      - stalwart_s3_credentials:/etc/stalwart-s3
 
   stalwart-config:
+    depends_on:
+      stalwart-garage-init:
+        condition: service_completed_successfully
     image: node:20-alpine
     restart: "no"
     environment:
       - STALWART_CONFIG_DIR=/etc/stalwart
+      - STALWART_UID=${STALWART_UID:-2000}
       - STALWART_HOSTNAME=${STALWART_HOSTNAME:-mail.example.com}
+      - STALWART_DEFAULT_DOMAIN=${STALWART_DEFAULT_DOMAIN:-}
+      - STALWART_HTTP_CORS_ALLOWED_ORIGINS=${STALWART_HTTP_CORS_ALLOWED_ORIGINS:-https://${BULWARK_WEBMAIL_HOSTNAME:-webmail.example.com}}
+      - STALWART_HTTP_PERMISSIVE_CORS=${STALWART_HTTP_PERMISSIVE_CORS:-false}
+      - STALWART_ALLOWED_IP=${STALWART_ALLOWED_IP:-}
       - STALWART_ADMIN_USER=${STALWART_ADMIN_USER:-admin}
       - STALWART_ADMIN_PASSWORD=${STALWART_ADMIN_PASSWORD:-change-me-stalwart-admin}
       - STALWART_ACME_ENABLED=${STALWART_ACME_ENABLED:-false}
-      - STALWART_ACME_DIRECTORY=${STALWART_ACME_DIRECTORY:-https://acme-v02.api.letsencrypt.org/directory}
-      - STALWART_ACME_CHALLENGE=${STALWART_ACME_CHALLENGE:-tls-alpn-01}
-      - STALWART_ACME_CONTACT=${STALWART_ACME_CONTACT:-}
-      - STALWART_ACME_DOMAINS=${STALWART_ACME_DOMAINS:-}
-      - STALWART_ACME_CACHE=${STALWART_ACME_CACHE:-%{BASE_PATH}%/etc/acme}
-      - STALWART_ACME_RENEW_BEFORE=${STALWART_ACME_RENEW_BEFORE:-30d}
-      - STALWART_ACME_DEFAULT=${STALWART_ACME_DEFAULT:-true}
-      - STALWART_ACME_DNS_PROVIDER=${STALWART_ACME_DNS_PROVIDER:-}
-      - STALWART_ACME_DNS_POLLING_INTERVAL=${STALWART_ACME_DNS_POLLING_INTERVAL:-15s}
-      - STALWART_ACME_DNS_PROPAGATION_TIMEOUT=${STALWART_ACME_DNS_PROPAGATION_TIMEOUT:-1m}
-      - STALWART_ACME_DNS_TTL=${STALWART_ACME_DNS_TTL:-5m}
-      - STALWART_ACME_DNS_ORIGIN=${STALWART_ACME_DNS_ORIGIN:-}
-      - STALWART_ACME_DNS_CF_SECRET=${STALWART_ACME_DNS_CF_SECRET:-}
-      - STALWART_ACME_DNS_CF_EMAIL=${STALWART_ACME_DNS_CF_EMAIL:-}
-      - STALWART_ACME_DNS_CF_TIMEOUT=${STALWART_ACME_DNS_CF_TIMEOUT:-30s}
-      - STALWART_ACME_DNS_RFC_HOST=${STALWART_ACME_DNS_RFC_HOST:-}
-      - STALWART_ACME_DNS_RFC_PORT=${STALWART_ACME_DNS_RFC_PORT:-53}
-      - STALWART_ACME_DNS_RFC_PROTOCOL=${STALWART_ACME_DNS_RFC_PROTOCOL:-udp}
-      - STALWART_ACME_DNS_RFC_ALGORITHM=${STALWART_ACME_DNS_RFC_ALGORITHM:-hmac-sha256}
-      - STALWART_ACME_DNS_RFC_KEY=${STALWART_ACME_DNS_RFC_KEY:-}
-      - STALWART_ACME_DNS_RFC_SECRET=${STALWART_ACME_DNS_RFC_SECRET:-}
-      - STALWART_PROXY_TRUSTED_NETWORKS=${STALWART_PROXY_TRUSTED_NETWORKS:-}
-      - STALWART_PROXY_AUTODETECT=${STALWART_PROXY_AUTODETECT:-false}
-      - STALWART_DOCKER_SOCKET_PATH=${STALWART_DOCKER_SOCKET_PATH:-/var/run/docker.sock}
       - STALWART_HTTP_USE_X_FORWARDED=${STALWART_HTTP_USE_X_FORWARDED:-false}
       - STALWART_DB_USER=${STALWART_DB_USER:-stalwart}
       - STALWART_DB_PASSWORD=${STALWART_DB_PASSWORD:-stalwart}
       - STALWART_DB_NAME=${STALWART_DB_NAME:-stalwart}
       - STALWART_REDIS_PASSWORD=${STALWART_REDIS_PASSWORD:-stalwart}
-      - STALWART_MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
-      - STALWART_MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
-      - STALWART_MINIO_BUCKET=${STALWART_MINIO_BUCKET:-stalwart}
-      - STALWART_MINIO_REGION=${STALWART_MINIO_REGION:-us-east-1}
-      - STALWART_MINIO_ENDPOINT=http://stalwart-minio:9000
+      - STALWART_S3_BUCKET=${STALWART_S3_BUCKET:-stalwart}
+      - STALWART_S3_REGION=${STALWART_S3_REGION:-garage}
+      - STALWART_S3_ENDPOINT=http://stalwart-garage:3900
+      - STALWART_S3_ACCESS_KEY_FILE=/etc/stalwart-s3/access-key
+      - STALWART_S3_SECRET_KEY_FILE=/etc/stalwart-s3/secret-key
     command: ["node", "/scripts/init.mjs"]
     volumes:
       - ./scripts/stalwart:/scripts:ro
       - stalwart_config:/etc/stalwart
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - stalwart_s3_credentials:/etc/stalwart-s3:ro
 
   stalwart:
+    hostname: ${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
     image: ${STALWART_IMAGE:-stalwartlabs/stalwart:latest}
     command: ["--config", "/etc/stalwart/config.json"]
     restart: unless-stopped
@@ -121,13 +116,12 @@ services:
       - STALWART_PUBLIC_URL=${STALWART_PUBLIC_URL:-https://mail.example.com}
       - STALWART_RECOVERY_ADMIN=${STALWART_ADMIN_USER:-admin}:${STALWART_ADMIN_PASSWORD:-change-me-stalwart-admin}
       - STALWART_DB_PASSWORD=${STALWART_DB_PASSWORD:-stalwart}
-      - STALWART_MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:-stalwart-minio}
     depends_on:
       stalwart-db:
         condition: service_healthy
       stalwart-redis:
         condition: service_healthy
-      stalwart-minio-init:
+      stalwart-garage-init:
         condition: service_completed_successfully
       stalwart-config:
         condition: service_completed_successfully
@@ -172,34 +166,21 @@ services:
       - "4190:4190"
     volumes:
       - stalwart_config:/etc/stalwart
+      - stalwart_s3_credentials:/etc/stalwart-s3:ro
       - stalwart_data:/var/lib/stalwart
 
-  tmail-web:
-    image: linagora/tmail-web:latest
-    restart: unless-stopped
-    depends_on:
-      stalwart:
-        condition: service_started
-    environment:
-      - STALWART_HOSTNAME=${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}
-      - STALWART_WEBMAIL_HOSTNAME=${STALWART_WEBMAIL_HOSTNAME:?STALWART_WEBMAIL_HOSTNAME is required}
-      - STALWART_HTTP_PROTOCOL=${STALWART_HTTP_PROTOCOL:-https}
-    command: |
-      /bin/sh -c "cat <<EOF > /usr/share/nginx/html/assets/env.file
-      SERVER_URL=$$STALWART_HTTP_PROTOCOL://$$STALWART_HOSTNAME
-      DOMAIN_REDIRECT_URL=$$STALWART_HTTP_PROTOCOL://$$STALWART_WEBMAIL_HOSTNAME
-      WEB_OIDC_CLIENT_ID=tmail-web
-      APP_GRID_AVAILABLE=unsupported
-      FCM_AVAILABLE=supported
-      IOS_FCM=supported
-      PLATFORM=other
-      FORCE_EMAIL_QUERY=false
-      EOF
-      exec nginx -g 'daemon off;'"
+  bulwark-web:
+    extends:
+      file: docker-compose.bulwark.yml
+      service: bulwark-web
 
 volumes:
+  bulwark_data:
   stalwart_config:
   stalwart_data:
   stalwart_db_data:
   stalwart_redis_data:
-  stalwart_minio_data:
+  stalwart_garage_config:
+  stalwart_garage_meta:
+  stalwart_garage_data:
+  stalwart_s3_credentials:

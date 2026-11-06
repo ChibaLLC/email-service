@@ -1,0 +1,19 @@
+# Migration only: retain the old blob store while copying/verifying its objects.
+# Combine with the new main Compose file; remove only after changing BlobStore.
+services:
+  stalwart-minio:
+    image: ${STALWART_LEGACY_MINIO_IMAGE:-ghcr.io/coollabsio/minio:latest}
+    restart: unless-stopped
+    command: server /data
+    environment:
+      - MINIO_ROOT_USER=${STALWART_MINIO_ROOT_USER:-stalwart}
+      - MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:?Existing MinIO password is required during migration}
+    volumes:
+      - stalwart_minio_data:/data
+
+  stalwart:
+    environment:
+      - STALWART_MINIO_ROOT_PASSWORD=${STALWART_MINIO_ROOT_PASSWORD:?Existing MinIO password is required during migration}
+
+volumes:
+  stalwart_minio_data:
