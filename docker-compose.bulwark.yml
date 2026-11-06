@@ -26,15 +26,20 @@ services:
       file: docker-compose.stalwart.yml
       service: stalwart-redis
 
-  stalwart-minio:
+  stalwart-garage-config:
     extends:
       file: docker-compose.stalwart.yml
-      service: stalwart-minio
+      service: stalwart-garage-config
 
-  stalwart-minio-init:
+  stalwart-garage:
     extends:
       file: docker-compose.stalwart.yml
-      service: stalwart-minio-init
+      service: stalwart-garage
+
+  stalwart-garage-init:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-garage-init
 
   stalwart-config:
     extends:
@@ -120,4 +125,7 @@ volumes:
   stalwart_data:
   stalwart_db_data:
   stalwart_redis_data:
-  stalwart_minio_data:
+  stalwart_garage_config:
+  stalwart_garage_meta:
+  stalwart_garage_data:
+  stalwart_s3_credentials:

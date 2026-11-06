@@ -30,3 +30,6 @@ docker/postal/config/
 # Generated Listmonk dev config and data
 docker/listmonk/config/
 docker/listmonk/uploads/
+# Python provisioning helpers
+__pycache__/
+*.pyc
