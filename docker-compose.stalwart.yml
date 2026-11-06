@@ -67,11 +67,12 @@ services:
         condition: service_started
     environment:
       - STALWART_S3_BUCKET=${STALWART_S3_BUCKET:-stalwart}
-      - GARAGE_CAPACITY_BYTES=${GARAGE_CAPACITY_BYTES:-10000000000}
+      - GARAGE_CAPACITY_BYTES=${GARAGE_CAPACITY_BYTES:-}
       - STALWART_UID=${STALWART_UID:-2000}
     volumes:
       - ./scripts/garage:/scripts:ro
       - stalwart_garage_config:/etc/garage:ro
+      - stalwart_garage_data:/var/lib/garage/data:ro
       - stalwart_s3_credentials:/etc/stalwart-s3
 
   stalwart-config:
