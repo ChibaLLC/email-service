@@ -1,0 +1,122 @@
+# Adopt an initialized production installation into Dokploy.
+# Existing volumes and networks must already exist. This intentionally does not
+# run the bootstrap services or enable Postal, Listmonk, or Libredesk.
+services:
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+  app:
+    extends:
+      file: docker-compose.yml
+      service: app
+    image: ${EMAIL_APP_IMAGE:-email-service-app:latest}
+    ports:
+      - "127.0.0.1:${EMAIL_APP_LOCAL_PORT:-3001}:3000"
+    networks: [default, webmail-proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}
+      traefik.http.routers.email-app.rule: Host(`${EMAIL_APP_HOSTNAME:?EMAIL_APP_HOSTNAME is required}`)
+      traefik.http.routers.email-app.entrypoints: ${BULWARK_TRAEFIK_HTTPS_ENTRYPOINT:-websecure}
+      traefik.http.routers.email-app.tls: "true"
+      traefik.http.routers.email-app.tls.certresolver: ${BULWARK_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.routers.email-app.service: email-app
+      traefik.http.services.email-app.loadbalancer.server.port: "3000"
+  stalwart-db:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-db
+  stalwart-redis:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-redis
+  stalwart-garage:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart-garage
+    depends_on: !reset {}
+  stalwart:
+    extends:
+      file: docker-compose.stalwart.yml
+      service: stalwart
+    depends_on: !override
+      stalwart-db:
+        condition: service_healthy
+      stalwart-redis:
+        condition: service_healthy
+      stalwart-garage:
+        condition: service_started
+    networks: [default, webmail-proxy]
+    ports:
+      - "127.0.0.1:8080:8080"
+    labels: !override
+      traefik.enable: "true"
+      traefik.docker.network: ${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}
+      traefik.http.routers.stalwart-admin.rule: Host(`${STALWART_HOSTNAME:?STALWART_HOSTNAME is required}`)
+      traefik.http.routers.stalwart-admin.entrypoints: ${BULWARK_TRAEFIK_HTTPS_ENTRYPOINT:-websecure}
+      traefik.http.routers.stalwart-admin.tls: "true"
+      traefik.http.routers.stalwart-admin.tls.certresolver: ${BULWARK_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.routers.stalwart-admin.service: stalwart-http
+      traefik.http.services.stalwart-http.loadbalancer.server.port: "8080"
+  bulwark-web:
+    extends:
+      file: docker-compose.bulwark.yml
+      service: bulwark-web
+    networks: [default, webmail-proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}
+      traefik.http.routers.bulwark.rule: Host(`${BULWARK_WEBMAIL_HOSTNAME:?BULWARK_WEBMAIL_HOSTNAME is required}`)
+      traefik.http.routers.bulwark.entrypoints: ${BULWARK_TRAEFIK_HTTPS_ENTRYPOINT:-websecure}
+      traefik.http.routers.bulwark.tls: "true"
+      traefik.http.routers.bulwark.tls.certresolver: ${BULWARK_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.routers.bulwark.service: bulwark
+      traefik.http.services.bulwark.loadbalancer.server.port: ${BULWARK_PORT:-3000}
+
+networks:
+  default:
+    external: true
+    name: ${MAIL_DOCKER_NETWORK:-email-service_default}
+  webmail-proxy:
+    external: true
+    name: ${BULWARK_TRAEFIK_DOCKER_NETWORK:-dokploy-network}
+
+volumes:
+  postgres_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_postgres_data
+  redis_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_redis_data
+  stalwart_db_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_db_data
+  stalwart_redis_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_redis_data
+  stalwart_config:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_config
+  stalwart_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_data
+  stalwart_s3_credentials:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_s3_credentials
+  stalwart_garage_config:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_garage_config
+  stalwart_garage_meta:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_garage_meta
+  stalwart_garage_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_stalwart_garage_data
+  bulwark_data:
+    external: true
+    name: ${MAIL_VOLUME_PREFIX:-email-service}_bulwark_data
